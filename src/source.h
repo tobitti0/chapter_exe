@@ -1,10 +1,27 @@
-// 入力クラス
+// 蜈･蜉帙け繝ｩ繧ｹ
+#ifndef __SOURCE__
+#define __SOURCE__
 
-#pragma once
+#undef UNICODE
+#ifdef _WIN32
+  #include <windows.h>
+#else
+  #include <dlfcn.h>
+  #include <limits.h>
 
-#include "stdafx.h"
+  #define LoadLibrary(x) dlopen(x, RTLD_NOW | RTLD_LOCAL)
+  #define GetProcAddress dlsym
+  #define FreeLibrary dlclose
+#endif
+#include <string>
+#include <algorithm>
+#include <cstdio>
+#include <string.h>
+#include "input.h"
 
-interface Source {
+using namespace std;
+
+class Source {
 public:
 	virtual int add_ref() = 0;
 	virtual int release() = 0;
@@ -20,10 +37,10 @@ public:
 	virtual int read_audio(int frame, short *buf) = 0;
 };
 
-// 空のソース
+// 遨ｺ縺ｮ繧ｽ繝ｼ繧ｹ
 class NullSource : public Source {
 protected:
-	NullSource() : _ref(1) { ZeroMemory(&_ip, sizeof(_ip)); }
+	NullSource() : _ref(1) { memset(&_ip, 0, sizeof(_ip)); }
 	virtual ~NullSource() { }
 
 	INPUT_INFO _ip;
@@ -47,12 +64,18 @@ public:
 	int read_audio(int frame, short *buf) { return 0; };
 };
 
-// auiを使ったソース
+#ifdef _WIN32
+typedef INPUT_PLUGIN_TABLE* (__stdcall  *GET_PLUGIN_TABLE)(void);
+#else
+typedef INPUT_PLUGIN_TABLE* (*GET_PLUGIN_TABLE)(void);
+#endif
+
+// aui繧剃ｽｿ縺｣縺溘た繝ｼ繧ｹ
 class AuiSource : public NullSource {
 protected:
 	string _in, _plugin;
 
-	HMODULE _dll;
+	void* _dll;
 
 	INPUT_PLUGIN_TABLE *_ipt;
 	INPUT_HANDLE _ih;
@@ -66,7 +89,7 @@ public:
 		}
 	}
 
-	virtual void init(char *infile) {
+	virtual void init(const char *infile) {
 		_in = infile;
 		_plugin = "avsinp.aui";
 
@@ -83,7 +106,7 @@ public:
 			throw "   plugin loading failed.";
 		}
 
-		FARPROC f = GetProcAddress(_dll, _T("GetInputPluginTable"));
+		GET_PLUGIN_TABLE f = (GET_PLUGIN_TABLE)GetProcAddress(_dll, "GetInputPluginTable");
 		if (f == NULL) {
 			throw "   not Aviutl input plugin error.";
 		}
@@ -92,17 +115,17 @@ public:
 			throw "   not Aviutl input plugin error.";
 		}
 		if (_ipt->func_init) {
-			if (_ipt->func_init() == FALSE) {
+			if (_ipt->func_init() == false) {
 				throw "   func_init() failed.";
 			}
 		}
 
-		_ih = _ipt->func_open((LPSTR)_in.c_str());
+		_ih = _ipt->func_open((char*)_in.c_str());
 		if (_ih == NULL) {
 			throw "   func_open() failed.";
 		}
 
-		if (_ipt->func_info_get(_ih, &_ip) == FALSE) {
+		if (_ipt->func_info_get(_ih, &_ip) == false) {
 			throw "   func_info_get() failed...";
 		}
 	}
@@ -152,13 +175,13 @@ public:
 	}
 };
 
-// *.wavソース
+// *.wav繧ｽ繝ｼ繧ｹ
 class WavSource : public NullSource {
 	string _in;
 
 	FILE *_f;
-	__int64 _start;
-	__int64 _end;
+	int64_t _start;
+	int64_t _end;
 	WAVEFORMATEX _fmt;
 
 public:
@@ -169,7 +192,7 @@ public:
 		}
 	}
 
-	void init(char *infile) {
+	void init(const char *infile) {
 		printf(" -WavSource\n");
 		_f = fopen(infile, "rb");
 		if (_f == NULL) {
@@ -194,7 +217,7 @@ public:
 			int size = 0;
 			fread(&size, 4, 1, _f);
 			if (strncmp(buf, "fmt ", 4) == 0) {
-				if (fread(&_fmt, min(size, sizeof(_fmt)), 1, _f) != 1) {
+				if (fread(&_fmt, min(size, (int)sizeof(_fmt)), 1, _f) != 1) {
 					throw "   illegal WAVE file.";
 				}
 				if (_fmt.wFormatTag != WAVE_FORMAT_PCM) {
@@ -206,7 +229,11 @@ public:
 				}
 			} else if (strncmp(buf, "data", 4) == 0){
 				fseek(_f, 4, SEEK_CUR);
+#ifdef _WIN32
 				_start = _ftelli64(_f);
+#else
+				_start = ftello(_f);
+#endif
 				break;
 			} else {
 				fseek(_f, size, SEEK_CUR);
@@ -217,7 +244,7 @@ public:
 			throw "   maybe not wav file.";
 		}
 
-		ZeroMemory(&_ip, sizeof(_ip));
+		memset(&_ip, 0, sizeof(_ip));
 		_ip.flag |= INPUT_INFO_FLAG_AUDIO;
 		_ip.audio_format = &_fmt;
 		_ip.audio_format_size = sizeof(_fmt);
@@ -225,11 +252,186 @@ public:
 	}
 
 	int read_audio(int frame, short *buf) {
-		__int64 start = (int)((double)frame * _ip.audio_format->nSamplesPerSec / _ip.rate * _ip.scale);
-		__int64 end = (int)((double)(frame + 1) * _ip.audio_format->nSamplesPerSec / _ip.rate * _ip.scale);
+		int64_t start = (int)((double)frame * _ip.audio_format->nSamplesPerSec / _ip.rate * _ip.scale);
+		int64_t end = (int)((double)(frame + 1) * _ip.audio_format->nSamplesPerSec / _ip.rate * _ip.scale);
 
+#ifdef _WIN32
 		_fseeki64(_f, _start + start * _fmt.nBlockAlign, SEEK_SET);
+#else
+		fseeko(_f, _start + start * _fmt.nBlockAlign, SEEK_SET);
+#endif
 
 		return fread(buf, _fmt.nBlockAlign, (size_t)(end - start), _f);
 	}
 };
+
+
+// *.avs繧ｽ繝ｼ繧ｹ
+#include "avs_internal.c"
+
+class AvsSource : public NullSource {
+protected:
+	avs_hnd_t avs_h;
+	AVS_VideoInfo *inf;
+
+  BITMAPINFOHEADER format;
+  WAVEFORMATEX audio_format;
+
+public:
+  AvsSource(void) 
+    : NullSource()
+    , avs_h({0})
+    , format()
+    , audio_format()
+  {}
+	~AvsSource() {
+    if(avs_h.library)
+        internal_avs_close_library(&avs_h);
+	}
+
+  virtual void init(const char *infile) {
+		int interlaced = 0;
+    int tff = 0;
+		if(internal_avs_load_library(&avs_h) < 0) {
+        throw "error: failed to load avisynth.dll";
+    }
+
+    avs_h.env = avs_h.func.avs_create_script_environment(AVS_INTERFACE_25);
+    if(avs_h.func.avs_get_error) {
+        const char *error = avs_h.func.avs_get_error(avs_h.env);
+        if(error) {
+            throw error;
+        }
+    }
+
+    AVS_Value arg = avs_new_value_string(infile);
+    AVS_Value res = avs_h.func.avs_invoke(avs_h.env, "Import", arg, NULL);
+    if(avs_is_error(res)) {
+        throw avs_as_string(res);
+    }
+		/* check if the user is using a multi-threaded script and apply distributor if necessary.
+		adapted from avisynth's vfw interface */
+    AVS_Value mt_test = avs_h.func.avs_invoke(avs_h.env, "GetMTMode", avs_new_value_bool(0), NULL);
+    int mt_mode = avs_is_int(mt_test) ? avs_as_int(mt_test) : 0;
+    avs_h.func.avs_release_value(mt_test);
+    if( mt_mode > 0 && mt_mode < 5 ) {
+        AVS_Value temp = avs_h.func.avs_invoke(avs_h.env, "Distributor", res, NULL);
+        avs_h.func.avs_release_value(res);
+        res = temp;
+    }
+    if(!avs_is_clip(res)) {
+        throw "error: inputfile didn't return a video clip";
+    }
+    avs_h.clip = avs_h.func.avs_take_clip(res, avs_h.env);
+    inf = avs_h.func.avs_get_video_info(avs_h.clip);
+    if(!avs_has_video(inf)) {
+        throw "error: inputfile has no video data";
+    }
+    /* if the clip is made of fields instead of frames, call weave to make them frames */
+    if(avs_is_field_based(inf)) {
+        fprintf(stderr, "detected fieldbased (separated) input, weaving to frames\n");
+        AVS_Value tmp = avs_h.func.avs_invoke(avs_h.env, "Weave", res, NULL);
+        if(avs_is_error(tmp)) {
+            throw "error: couldn't weave fields into frames";
+        }
+        res = internal_avs_update_clip(&avs_h, &inf, tmp, res);
+        interlaced = 1;
+        tff = avs_is_tff(inf);
+    }
+
+    if( avs_is_planar(inf) == false )
+    {
+			fprintf(stderr, "converting input clip to Y420\n");
+
+			const char *arg_name[2] = {NULL, "interlaced"};
+			AVS_Value arg_arr[2] = {res, avs_new_value_bool(interlaced)};
+			AVS_Value tmp = avs_h.func.avs_invoke(avs_h.env, "ConvertToY420", avs_new_value_array(arg_arr, 2), arg_name);
+			if(avs_is_error(tmp)) {
+					throw "error: couldn't convert input clip to Y420";
+			}
+			res = internal_avs_update_clip(&avs_h, &inf, tmp, res);
+    }
+    if (inf->num_audio_samples > 0 && avs_bytes_per_channel_sample(inf) != 2) {
+      fprintf(stderr, "converting input clip to 16bit audio\n");
+
+			AVS_Value tmp = avs_h.func.avs_invoke(avs_h.env, "ConvertAudioTo16bit", res, NULL);
+			if(avs_is_error(tmp)) {
+					throw "error: couldn't convert input clip to 16bit audio";
+			}
+			res = internal_avs_update_clip(&avs_h, &inf, tmp, res);
+    }
+
+    _ip.flag = INPUT_INFO_FLAG_VIDEO_RANDOM_ACCESS | INPUT_INFO_FLAG_VIDEO;
+    if (inf->num_audio_samples > 0) {
+        _ip.flag |= INPUT_INFO_FLAG_AUDIO;
+    }
+    _ip.rate = inf->fps_numerator;
+    _ip.scale = inf->fps_denominator;
+    _ip.n = inf->num_frames;
+    _ip.format = &format;
+    format.biHeight = inf->height;
+    format.biWidth = inf->width;
+    // 48kHz縺ｧ12譎る俣繧定ｶ�縺医ｋ縺ｨINT_MAX繧定ｶ翫∴縺ｦ縺励∪縺�縺瑚｡ｨ遉ｺ縺ｫ縺励°菴ｿ縺｣縺ｦ縺�縺ｪ縺�縺ｮ縺ｧOK
+    _ip.audio_n = (int)min((INT64)INT_MAX, inf->num_audio_samples);
+    _ip.audio_format = &audio_format;
+    audio_format.nChannels = inf->nchannels;
+    audio_format.nSamplesPerSec = inf->audio_samples_per_second;
+
+    avs_h.func.avs_release_value(res);
+  }
+
+  bool has_video() {
+    return (_ip.flag & INPUT_INFO_FLAG_VIDEO) != 0;
+  }
+  bool has_audio() {
+    return (_ip.flag & INPUT_INFO_FLAG_AUDIO) != 0;
+  }
+
+  INPUT_INFO &get_input_info() {
+    return _ip;
+  }
+
+  bool read_video_y8(int frame, unsigned char *luma) {
+    AVS_VideoFrame *f = avs_h.func.avs_get_frame(avs_h.clip, frame);
+    const char *err = avs_h.func.avs_clip_get_error(avs_h.clip);
+    if(err) {
+      throw err;
+    }
+    static const int planes[] = {AVS_PLANAR_Y, AVS_PLANAR_U, AVS_PLANAR_V};
+    int pitch = avs_get_pitch_p(f, planes[0]);
+    const unsigned char* data = avs_get_read_ptr_p(f, planes[0]);
+
+    int w = _ip.format->biWidth & 0xFFFFFFF0;
+    int h = _ip.format->biHeight & 0xFFFFFFF0;
+
+		//avs_h.func.avs_bit_blt(avs_h.env, luma, w, data, pitch, w, h);
+    for (int i=0; i<h; i++) {
+      const unsigned char* p = data + pitch*i;
+			for (int j=0; j<w; j++) {
+				*luma = *p;
+
+				luma++;
+				p ++;
+			}
+		}
+    avs_h.func.avs_release_video_frame(f);
+    return true;
+  }
+
+  int read_audio(int frame, short *buf) {
+    int64_t start = (int64_t)((double)frame * _ip.audio_format->nSamplesPerSec / _ip.rate * _ip.scale);
+		int64_t end = (int64_t)((double)(frame + 1) * _ip.audio_format->nSamplesPerSec / _ip.rate * _ip.scale);
+    if(end >= inf->num_audio_samples){
+			return 0;
+		}
+    avs_h.func.avs_get_audio(avs_h.clip, buf, start, end - start);
+    const char *err = avs_h.func.avs_clip_get_error(avs_h.clip);
+    if(err) {
+      throw err;
+    }
+
+    return int(end - start);
+  }
+};
+
+#endif

@@ -1,30 +1,30 @@
 2012/11/24 Yobi
-•ÏX‚µ‚½ƒtƒ@ƒCƒ‹‚Í‰º‹L‚Q‚ÂAƒV[ƒ“ƒ`ƒFƒ“ƒWŒŸoŠÖ˜A‚Ì‚Ý
+å¤‰æ›´ã—ãŸãƒ•ã‚¡ã‚¤ãƒ«ã¯ä¸‹è¨˜ï¼’ã¤ã€ã‚·ãƒ¼ãƒ³ãƒã‚§ãƒ³ã‚¸æ¤œå‡ºé–¢é€£ã®ã¿
 chapter_exe.cpp
 mvec.cpp
 
 2013/6/1 sysuzu
-•ÏXFchapter_exe.cpp
-	nomute ‚Å‚È‚­‚Ä‚à seri >= Žw’è–³‰¹” ‚È‚çƒV[ƒ“ƒ`ƒFƒ“ƒWŒŸoi–³‰¹ƒGƒ“ƒhƒJ[ƒhI—¹’n“_ŒŸo—p
-	Žw’è–³‰¹”—p‚Éˆø”@-b <int>@‚ð’Ç‰Á
-	abs(buf[j]) > mute”»’èŽž‚Énaudio * ƒ`ƒƒƒ“ƒlƒ‹”‚ðíœ
+å¤‰æ›´ï¼šchapter_exe.cpp
+	nomute ã§ãªãã¦ã‚‚ seri >= æŒ‡å®šç„¡éŸ³æ•° ãªã‚‰ã‚·ãƒ¼ãƒ³ãƒã‚§ãƒ³ã‚¸æ¤œå‡ºï¼ˆç„¡éŸ³ã‚¨ãƒ³ãƒ‰ã‚«ãƒ¼ãƒ‰çµ‚äº†åœ°ç‚¹æ¤œå‡ºç”¨
+	æŒ‡å®šç„¡éŸ³æ•°ç”¨ã«å¼•æ•°ã€€-b <int>ã€€ã‚’è¿½åŠ 
+	abs(buf[j]) > muteåˆ¤å®šæ™‚ã«naudio * ãƒãƒ£ãƒ³ãƒãƒ«æ•°ã‚’å‰Šé™¤
 	
-’Ç‰ÁFchapter_exe.rc
-	ƒvƒƒpƒeƒB‚Åƒo[ƒWƒ‡ƒ“Œ©‚ê‚é‚æ‚¤‚É’Ç‰Á@ver 15.2 (r15 mod2)
+è¿½åŠ ï¼šchapter_exe.rc
+	ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£ã§ãƒãƒ¼ã‚¸ãƒ§ãƒ³è¦‹ã‚Œã‚‹ã‚ˆã†ã«è¿½åŠ ã€€ver 15.2 (r15 mod2)
 
 2013/11/28 Yobi
-•ÏXFchapter_exe.cpp
-	ƒV[ƒ“ƒ`ƒFƒ“ƒWŒŸõŽÀsƒtƒŒ[ƒ€ŠÖ˜A‚Ì•ÏX
-	–³‰¹ŒŸõ”ÍˆÍ‚ðŠg‘å‚·‚éˆø”@-e <int>@‚ð’Ç‰Á
-•ÏXFchapter_exe.rc
-	ƒvƒƒpƒeƒB‚Ìƒo[ƒWƒ‡ƒ“‚ð•ÏX ver15.3(r15 mod3)
+å¤‰æ›´ï¼šchapter_exe.cpp
+	ã‚·ãƒ¼ãƒ³ãƒã‚§ãƒ³ã‚¸æ¤œç´¢å®Ÿè¡Œãƒ•ãƒ¬ãƒ¼ãƒ é–¢é€£ã®å¤‰æ›´
+	ç„¡éŸ³æ¤œç´¢ç¯„å›²ã‚’æ‹¡å¤§ã™ã‚‹å¼•æ•°ã€€-e <int>ã€€ã‚’è¿½åŠ 
+å¤‰æ›´ï¼šchapter_exe.rc
+	ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£ã®ãƒãƒ¼ã‚¸ãƒ§ãƒ³ã‚’å¤‰æ›´ ver15.3(r15 mod3)
 
 2014/7/17 Yobi
-•ÏXFchapter_exe.cpp
-	ƒV[ƒ“ƒ`ƒFƒ“ƒW”»’èƒAƒ‹ƒSƒŠƒYƒ€‚Ì‰üC
-        –³‰¹ŒŸo‚ÌŠÔˆø‚«–³Œøˆ—iˆø”Žw’èŽžF--thin,--serialj
-	ƒV[ƒ“ƒ`ƒFƒ“ƒWƒfƒoƒbƒO—pî•ñ‚ð•t‰Á‚µ‚½o—Íiˆø”Žw’èŽžF--debugj
-•ÏXFmvec.cpp
-	ƒV[ƒ“ƒ`ƒFƒ“ƒW”»’èƒAƒ‹ƒSƒŠƒYƒ€‚Ì‰üC
-•ÏXFchapter_exe.rc
-	ƒvƒƒpƒeƒB‚Ìƒo[ƒWƒ‡ƒ“‚ð•ÏX ver15.4(r15 mod4)
+å¤‰æ›´ï¼šchapter_exe.cpp
+	ã‚·ãƒ¼ãƒ³ãƒã‚§ãƒ³ã‚¸åˆ¤å®šã‚¢ãƒ«ã‚´ãƒªã‚ºãƒ ã®æ”¹ä¿®
+        ç„¡éŸ³æ¤œå‡ºã®é–“å¼•ãç„¡åŠ¹å‡¦ç†ï¼ˆå¼•æ•°æŒ‡å®šæ™‚ï¼š--thin,--serialï¼‰
+	ã‚·ãƒ¼ãƒ³ãƒã‚§ãƒ³ã‚¸ãƒ‡ãƒãƒƒã‚°ç”¨æƒ…å ±ã‚’ä»˜åŠ ã—ãŸå‡ºåŠ›ï¼ˆå¼•æ•°æŒ‡å®šæ™‚ï¼š--debugï¼‰
+å¤‰æ›´ï¼šmvec.cpp
+	ã‚·ãƒ¼ãƒ³ãƒã‚§ãƒ³ã‚¸åˆ¤å®šã‚¢ãƒ«ã‚´ãƒªã‚ºãƒ ã®æ”¹ä¿®
+å¤‰æ›´ï¼šchapter_exe.rc
+	ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£ã®ãƒãƒ¼ã‚¸ãƒ§ãƒ³ã‚’å¤‰æ›´ ver15.4(r15 mod4)

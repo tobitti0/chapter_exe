@@ -1,16 +1,29 @@
-// chapter_exe.cpp : ѓRѓ“ѓ\Ѓ[ѓ‹ ѓAѓvѓЉѓPЃ[ѓVѓ‡ѓ“‚МѓGѓ“ѓgѓЉ ѓ|ѓCѓ“ѓg‚р’и‹`‚µ‚Ь‚·ЃB
+// chapter_exe.cpp : г‚ігѓіг‚Ѕгѓјгѓ« г‚ўгѓ—гѓЄг‚±гѓјг‚·гѓ§гѓігЃ®г‚Ёгѓігѓ€гѓЄ гѓќг‚¤гѓігѓ€г‚’е®љзѕ©гЃ—гЃѕгЃ™гЂ‚
 //
 
-#include "stdafx.h"
 #include "source.h"
 #include "faw.h"
+#include <stdint.h>
+
+#ifndef _WIN32
+#define sprintf_s sprintf
+#define _stricmp  strcasecmp
+#include <malloc.h>
+int fopen_s(FILE **fp,const char *s,const char *m)
+{
+*fp = fopen(s,m);
+return *fp == NULL;
+}
+#define _aligned_malloc(a,b) memalign(b,a)
+#define _aligned_free free
+#endif
 
 // mvec.c
 #define FRAME_PICTURE	1
 #define FIELD_PICTURE	2
 int mvec(int *mvec1,int *mvec2,int *flag_sc,unsigned char* current_pix,unsigned char* bef_pix,int lx,int ly,int threshold,int pict_struct, int nframe);
 
-// ‚P‰с‚М–і‰№ЉъЉФ“а‚Й•ЫЋќ‚·‚йЌЕ‘еѓVЃ[ѓ“ѓ`ѓFѓ“ѓWђ”
+// пј‘е›ћгЃ®з„Ўйџіжњџй–“е†…гЃ«дїќжЊЃгЃ™г‚‹жњЂе¤§г‚·гѓјгѓігѓЃг‚§гѓіг‚ёж•°
 #define DEF_SCMAX 100
 
 int proc_scene_change(
@@ -18,12 +31,12 @@ int proc_scene_change(
 	int w,int h,int start_fr,int seri,int setseri,int breakmute,int extendmute,int debug,int idx);
 
 
-// ’КЏн‚МЏo—Н
-void write_chapter(FILE *f, int nchap, int frame, TCHAR *title, INPUT_INFO *iip) {
-	LONGLONG t,h,m;
+// йЂљеёёгЃ®е‡єеЉ›
+void write_chapter(FILE *f, int nchap, int frame, char *title, INPUT_INFO *iip) {
+  int64_t t,h,m;
 	double s;
 
-	t = (LONGLONG)frame * 10000000 * iip->scale / iip->rate;
+	t = (int64_t)frame * 10000000 * iip->scale / iip->rate;
 	h = t / 36000000000;
 	m = (t - h * 36000000000) / 600000000;
 	s = (t - h * 36000000000 - m * 600000000) / 10000000.0;
@@ -32,12 +45,12 @@ void write_chapter(FILE *f, int nchap, int frame, TCHAR *title, INPUT_INFO *iip)
 	fprintf(f, "CHAPTER%02dNAME=%s\n", nchap, title);
 	fflush(f);
 }
-// ‰рђН—p‚МЏo—Н
-void write_chapter_debug(FILE *f, int nchap, int frame, TCHAR *title, INPUT_INFO *iip) {
-	LONGLONG t,h,m;
+// и§Јжћђз”ЁгЃ®е‡єеЉ›
+void write_chapter_debug(FILE *f, int nchap, int frame, char *title, INPUT_INFO *iip) {
+	int64_t t,h,m;
 	double s;
 
-	t = (LONGLONG)frame * 10000000 * iip->scale / iip->rate;
+	t = (int64_t)frame * 10000000 * iip->scale / iip->rate;
 	h = t / 36000000000;
 	m = (t - h * 36000000000) / 600000000;
 	s = (t - h * 36000000000 - m * 600000000) / 10000000.0;
@@ -48,20 +61,18 @@ void write_chapter_debug(FILE *f, int nchap, int frame, TCHAR *title, INPUT_INFO
 	fflush(f);
 }
 
-int _tmain(int argc, _TCHAR* argv[])
+int main(int argc, const char* argv[])
 {
-	// ѓЃѓ‚ѓЉѓЉЃ[ѓNѓ`ѓFѓbѓN
-	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
-	printf(_T("chapter.auf pre loading program.\n"));
-	printf(_T("usage:\n"));
-	printf(_T("\tchapter_exe.exe -v input_avs -o output_txt\n"));
-	printf(_T("params:\n\t-v “ь—Н‰ж‘њѓtѓ@ѓCѓ‹\n\t-a “ь—Н‰№ђєѓtѓ@ѓCѓ‹ЃiЏИ—ЄЋћ‚Н“®‰ж‚Ж“Ї‚¶ѓtѓ@ѓCѓ‹Ѓj\n\t-m –і‰№”»’ии‡’lЃi1Ѓ`2^15)\n\t-s ЌЕ’б–і‰№ѓtѓЊЃ[ѓЂђ”\n\t-b –і‰№ѓVЃ[ѓ“ЊџЌхЉФЉuђ”\n"));
-	printf(_T("\t-e –і‰№‘OЊгЊџЌхЉg’ЈѓtѓЊЃ[ѓЂђ”\n"));
+	printf("chapter.auf pre loading program.\n");
+	printf("usage:\n");
+	printf("\tchapter_exe.exe -v input_avs -o output_txt\n");
+	printf("params:\n\t-v е…ҐеЉ›з”»еѓЏгѓ•г‚Ўг‚¤гѓ«\n\t-a е…ҐеЉ›йџіеЈ°гѓ•г‚Ўг‚¤гѓ«пј€зњЃз•Ґж™‚гЃЇе‹•з”»гЃЁеђЊгЃгѓ•г‚Ўг‚¤гѓ«пј‰\n\t-m з„Ўйџіе€¤е®љй–ѕеЂ¤пј€1гЂњ2^15)\n\t-s жњЂдЅЋз„Ўйџігѓ•гѓ¬гѓјгѓ ж•°\n\t-b з„Ўйџіг‚·гѓјгѓіж¤њзґўй–“йљ”ж•°\n");
+	printf("\t-e з„Ўйџіе‰ЌеѕЊж¤њзґўж‹Ўејµгѓ•гѓ¬гѓјгѓ ж•°\n");
 
-	TCHAR *avsv = NULL;
-	TCHAR *avsa = NULL;
-	TCHAR *out =  NULL;
+	const char *avsv = NULL;
+	const char *avsa = NULL;
+	const char *out =  NULL;
 	short setmute = 50;
 	int setseri = 10;
 	int breakmute = 60;
@@ -70,7 +81,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	int debug = 0;
 
 	for(int i=1; i<argc-1; i++) {
-		char *s	= argv[i];
+		const char *s	= argv[i];
 		if (s[0] == '-') {
 			switch(s[1]) {
 			case 'v':
@@ -105,13 +116,13 @@ int _tmain(int argc, _TCHAR* argv[])
 				i++;
 				break;
 			case '-':
-				if (strcmp(&s[2], _T("debug")) == 0){
+				if (strcmp(&s[2], "debug") == 0){
 					debug = 1;
 				}
-				else if (strcmp(&s[2], _T("thin")) == 0){
+				else if (strcmp(&s[2], "thin") == 0){
 					thin_audio_read = 2;
 				}
-				else if (strcmp(&s[2], _T("serial")) == 0){
+				else if (strcmp(&s[2], "serial") == 0){
 					thin_audio_read = -1;
 				}
 				break;
@@ -124,7 +135,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		}
 	}
 
-	// ‰№ђє“ь—Н‚Є–і‚ўЏкЌ‡‚Н“®‰ж“а‚Й‚ ‚й‚Ж‰ј’и
+	// йџіеЈ°е…ҐеЉ›гЃЊз„ЎгЃ„е ґеђ€гЃЇе‹•з”»е†…гЃ«гЃ‚г‚‹гЃЁд»®е®љ
 	if (avsa == NULL) {
 		avsa = avsv;
 	}
@@ -134,29 +145,29 @@ int _tmain(int argc, _TCHAR* argv[])
 		return -1;
 	}
 
-	printf(_T("Setting\n"));
-	printf(_T("\tvideo: %s\n\taudio: %s\n\tout: %s\n"), avsv, (strcmp(avsv, avsa) ? avsa : "(within video source)"), out);
-	printf(_T("\tmute: %d seri: %d bmute: %d emute: %d\n"), setmute, setseri, breakmute, extendmute);
+	printf("Setting\n");
+	printf("\tvideo: %s\n\taudio: %s\n\tout: %s\n", avsv, (strcmp(avsv, avsa) ? avsa : "(within video source)"), out);
+	printf("\tmute: %d seri: %d bmute: %d emute: %d\n", setmute, setseri, breakmute, extendmute);
 
 	printf("Loading plugins.\n");
 
 	Source *video = NULL;
 	Source *audio = NULL;
 	try {
-		AuiSource *srcv = new AuiSource();
+		AvsSource *srcv = new AvsSource();
 		srcv->init(avsv);
 		if (srcv->has_video() == false) {
 			srcv->release();
 			throw "Error: No Video Found!";
 		}
 		video = srcv;
-		// “Ї‚¶ѓ\Ѓ[ѓX‚МЏкЌ‡‚Н“Ї‚¶ѓCѓ“ѓXѓ^ѓ“ѓX‚Е“З‚ЭЌћ‚Ю
+		// еђЊгЃг‚Ѕгѓјг‚№гЃ®е ґеђ€гЃЇеђЊгЃг‚¤гѓіг‚№г‚їгѓіг‚№гЃ§иЄ­гЃїиѕјг‚Ђ
 		if (strcmp(avsv, avsa) == 0 && srcv->has_audio()) {
 			audio = srcv;
 			audio->add_ref();
 		}
 
-		// ‰№ђє‚Є•Кѓtѓ@ѓCѓ‹‚МЋћ
+		// йџіеЈ°гЃЊе€Ґгѓ•г‚Ўг‚¤гѓ«гЃ®ж™‚
 		if (audio == NULL) {
 			if (strlen(avsa) > 4 && _stricmp(".wav", avsa + strlen(avsa) - 4) == 0) {
 				// wav
@@ -170,7 +181,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				}
 			} else {
 				// aui
-				AuiSource *aud = new AuiSource();
+				AvsSource *aud = new AvsSource();
 				aud->init(avsa);
 				if (aud->has_audio()) {
 					audio = aud;
@@ -184,7 +195,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		if (audio == NULL) {
 			throw "Error: No Audio!";
 		}
-	} catch(char *s) {
+	} catch(const char *s) {
 		if (video) {
 			video->release();
 		}
@@ -192,7 +203,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		return -1;
 	}
 
-	// ‰№ђє‚Єlwinput.aui‚ѕ‚Б‚ЅЏкЌ‡‚НA‘±“З‚ЭЏo‚µ‚Є‘Ѓ‚­€А’и‚·‚й‚М‚ЕЉФ€ш‚«‚р‚№‚ё“З‚ЭЌћ‚Ю
+	// йџіеЈ°гЃЊlwinput.auiгЃ гЃЈгЃџе ґеђ€гЃЇйЂЈз¶љиЄ­гЃїе‡єгЃ—гЃЊж—©гЃЏе®‰е®љгЃ™г‚‹гЃ®гЃ§й–“еј•гЃЌг‚’гЃ›гЃљиЄ­гЃїиѕјг‚Ђ
 	if (strstr(avsa, "lwinput.aui://") != NULL){
 		if (thin_audio_read == 1){
 			thin_audio_read = 0;
@@ -210,23 +221,23 @@ int _tmain(int argc, _TCHAR* argv[])
 	INPUT_INFO &vii = video->get_input_info();
 	INPUT_INFO &aii = audio->get_input_info();
 
-	printf(_T("Movie data\n"));
-	printf(_T("\tVideo Frames: %d [%.02ffps]\n"), vii.n, (double)vii.rate / vii.scale);
-	DWORD fcc = vii.handler;
-	printf(_T("\tVideo Format: %c%c%c%c\n"), fcc & 0xFF, fcc >> 8 & 0xFF, fcc >> 16 & 0xFF, fcc >> 24);
+	printf("Movie data\n");
+	printf("\tVideo Frames: %d [%.02ffps]\n", vii.n, (double)vii.rate / vii.scale);
+	uint32_t fcc = vii.handler;
+	printf("\tVideo Format: %c%c%c%c\n", fcc & 0xFF, fcc >> 8 & 0xFF, fcc >> 16 & 0xFF, fcc >> 24);
 
-	printf(_T("\tAudio Samples: %d [%dHz]\n"), aii.audio_n, aii.audio_format->nSamplesPerSec);
+	printf("\tAudio Samples: %d [%dHz]\n", aii.audio_n, aii.audio_format->nSamplesPerSec);
 
 	if (fcc == 0x32424752 || fcc == 0x38344359) {
-		printf(_T("Error: Unsupported color RGB/YC48."));
+		printf("Error: Unsupported color RGB/YC48.");
 	}
 
 	if (fcc != 0x32595559) {
-		printf(_T("warning: only YUY2 is supported. continues...\n"));
+		printf("warning: only YUY2 is supported. continues...\n");
 		//return -1;
 	}
 
-	short buf[4800*2]; // 10fps€ИЏг
+	short buf[4800*2]; // 10fpsд»ҐдёЉ
 	int n = vii.n;
 
 	// FAW check
@@ -255,20 +266,23 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (thin_audio_read <= 0){
 		printf("read audio : serial\n");
 	}
-	printf(_T("--------\nStart searching...\n"));
+	printf("--------\nStart searching...\n");
 
 	short mute = setmute;
 	int seri = 0;
-	int cnt_mute = 0;
 	int idx = 1;
 	int volume;
-	int lastmute_scpos = -1;			// -eѓIѓvѓVѓ‡ѓ“‚МЊџЌхѓIЃ[ѓoЃ[ѓ‰ѓbѓv‚рЌl—¶‚µ‚Д‘O‰с€К’u•ЫЋќ
-	int lastmute_marker = -1;			// ѓ}Ѓ[ѓN•\Ћ¦—p‚М‹N“_€К’u•ЫЋќ
+	int lastmute_scpos = -1;			// -eг‚Єгѓ—г‚·гѓ§гѓігЃ®ж¤њзґўг‚Єгѓјгѓђгѓјгѓ©гѓѓгѓ—г‚’иЂѓж…®гЃ—гЃ¦е‰Ќе›ћдЅЌзЅ®дїќжЊЃ
+	int lastmute_marker = -1;			// гѓћгѓјг‚ЇиЎЁз¤єз”ЁгЃ®иµ·з‚№дЅЌзЅ®дїќжЊЃ
+	int w = vii.format->biWidth & 0xFFFFFFF0;
+	int h = vii.format->biHeight & 0xFFFFFFF0;
+	unsigned char *pix0 = (unsigned char*)_aligned_malloc(w * h, 32);
+	unsigned char *pix1 = (unsigned char*)_aligned_malloc(w * h, 32);
 
 	// start searching
-	for (int i=0; i<n; i++) {
+	for (int i=0; i<n-setseri-1; i++) {
 		// searching foward frame
-		if (seri == 0 && thin_audio_read > 0) {		// ЉФ€ш‚«‚µ‚И‚Є‚з–і‰№Љm”F
+		if (seri == 0 && thin_audio_read > 0) {		// й–“еј•гЃЌгЃ—гЃЄгЃЊг‚‰з„ЎйџізўєиЄЌ
 			int naudio = audio->read_audio(i+setseri-1, buf);
 
 			bool skip = false;
@@ -303,33 +317,27 @@ int _tmain(int argc, _TCHAR* argv[])
 			if (seri >= setseri) {
 				int start_fr = i - seri;
 
-				printf(_T("mute%2d: %d - %dѓtѓЊЃ[ѓЂ\n"), idx, start_fr, seri);
+				fprintf(stderr,"mute%2d: %d - %dгѓ•гѓ¬гѓјгѓ \n", idx, start_fr, seri);
 
-				int w = vii.format->biWidth & 0xFFFFFFF0;
-				int h = vii.format->biHeight & 0xFFFFFFF0;
-				unsigned char *pix0 = (unsigned char*)_aligned_malloc(1920*1088, 32);
-				unsigned char *pix1 = (unsigned char*)_aligned_malloc(1920*1088, 32);
-
-				//--- ‹жЉФ“а‚МѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚рЋж“ѕ ---
+				//--- еЊєй–“е†…гЃ®г‚·гѓјгѓігѓЃг‚§гѓіг‚ёг‚’еЏ–еѕ— ---
 				proc_scene_change(video, &lastmute_scpos, &lastmute_marker, fout, pix0, pix1, w, h,
 									start_fr, seri, setseri, breakmute, extendmute, debug, idx);
 
 
 				idx++;
-
-				_aligned_free(pix0);
-				_aligned_free(pix1);
 			}
 			seri = 0;
 		} else {
 			seri++;
 		}
 	}
-
-	// ЌЕЏIѓtѓЊЃ[ѓЂ”ФЌ†‚рЏo—НЃi‰ь‘ў”Е‚Е’З‰БЃj
+	fprintf(stderr,"end\n");
+	_aligned_free(pix0);
+	_aligned_free(pix1);
+	// жњЂзµ‚гѓ•гѓ¬гѓјгѓ з•ЄеЏ·г‚’е‡єеЉ›пј€ж”№йЂ з‰€гЃ§иїЅеЉ пј‰
 	fprintf(fout, "# SCPos:%d %d\n", n-1, n-1);
 
-	// ѓ\Ѓ[ѓX‚р‰р•ъ
+	// г‚Ѕгѓјг‚№г‚’и§Јж”ѕ
 	video->release();
 	audio->release();
 
@@ -337,58 +345,58 @@ int _tmain(int argc, _TCHAR* argv[])
 }
 
 
-// ‹жЉФ“а‚МѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚рЋж“ѕЃEЏo—Н
+// еЊєй–“е†…гЃ®г‚·гѓјгѓігѓЃг‚§гѓіг‚ёг‚’еЏ–еѕ—гѓ»е‡єеЉ›
 int proc_scene_change(
-	Source *video,					// ‰ж‘њѓNѓ‰ѓX
-	int *lastmute_scpos,			// -eѓIѓvѓVѓ‡ѓ“‚МЊџЌхѓIЃ[ѓoЃ[ѓ‰ѓbѓv‚рЌl—¶‚µ‚Д‘O‰с€К’u•ЫЋќЃiЏгЏ‘‚«ЌXђVЃj
-	int *lastmute_marker,			// ѓ}Ѓ[ѓN•\Ћ¦—p‚М‹N“_€К’u•ЫЋќЃiЏгЏ‘‚«ЌXђVЃj
-	FILE *fout,						// Џo—Нѓtѓ@ѓCѓ‹
-	unsigned char *pix0,			// ‰ж‘њѓfЃ[ѓ^•ЫЋќѓoѓbѓtѓ@Ѓi‚P–‡–ЪЃj
-	unsigned char *pix1,			// ‰ж‘њѓfЃ[ѓ^•ЫЋќѓoѓbѓtѓ@Ѓi‚Q–‡–ЪЃj
-	int w,							// ‰ж‘њ•ќ
-	int h,							// ‰ж‘њЌ‚‚і
-	int start_fr,					// ЉJЋnѓtѓЊЃ[ѓЂ”ФЌ†
-	int seri,						// –і‰№‹жЉФѓtѓЊЃ[ѓЂђ”
-	int setseri,					// ЌЕ’б–і‰№ѓtѓЊЃ[ѓЂђ”
-	int breakmute,					// –і‰№ѓVЃ[ѓ“ЊџЌхЉФЉuѓtѓЊЃ[ѓЂђ”
-	int extendmute,					// –і‰№‘OЊгЊџЌхЉg’ЈѓtѓЊЃ[ѓЂђ”
-	int debug,						// ѓfѓoѓbѓOЏо•с•\Ћ¦‚·‚йЋћ‚Н1
-	int idx							// –і‰№‹жЉФ’КЋZ”ФЌ†
+	Source *video,					// з”»еѓЏг‚Їгѓ©г‚№
+	int *lastmute_scpos,			// -eг‚Єгѓ—г‚·гѓ§гѓігЃ®ж¤њзґўг‚Єгѓјгѓђгѓјгѓ©гѓѓгѓ—г‚’иЂѓж…®гЃ—гЃ¦е‰Ќе›ћдЅЌзЅ®дїќжЊЃпј€дёЉж›ёгЃЌж›ґж–°пј‰
+	int *lastmute_marker,			// гѓћгѓјг‚ЇиЎЁз¤єз”ЁгЃ®иµ·з‚№дЅЌзЅ®дїќжЊЃпј€дёЉж›ёгЃЌж›ґж–°пј‰
+	FILE *fout,						// е‡єеЉ›гѓ•г‚Ўг‚¤гѓ«
+	unsigned char *pix0,			// з”»еѓЏгѓ‡гѓјг‚їдїќжЊЃгѓђгѓѓгѓ•г‚Ўпј€пј‘жћљз›®пј‰
+	unsigned char *pix1,			// з”»еѓЏгѓ‡гѓјг‚їдїќжЊЃгѓђгѓѓгѓ•г‚Ўпј€пј’жћљз›®пј‰
+	int w,							// з”»еѓЏе№…
+	int h,							// з”»еѓЏй«гЃ•
+	int start_fr,					// й–‹е§‹гѓ•гѓ¬гѓјгѓ з•ЄеЏ·
+	int seri,						// з„ЎйџіеЊєй–“гѓ•гѓ¬гѓјгѓ ж•°
+	int setseri,					// жњЂдЅЋз„Ўйџігѓ•гѓ¬гѓјгѓ ж•°
+	int breakmute,					// з„Ўйџіг‚·гѓјгѓіж¤њзґўй–“йљ”гѓ•гѓ¬гѓјгѓ ж•°
+	int extendmute,					// з„Ўйџіе‰ЌеѕЊж¤њзґўж‹Ўејµгѓ•гѓ¬гѓјгѓ ж•°
+	int debug,						// гѓ‡гѓђгѓѓг‚°жѓ…е ±иЎЁз¤єгЃ™г‚‹ж™‚гЃЇ1
+	int idx							// з„ЎйџіеЊєй–“йЂљз®—з•ЄеЏ·
 ){
-	const int space_sc1  = 5;		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЉФ‚МЌЕ’бѓtѓЊЃ[ѓЂЉФЉu
-	const int space_sc2 = 10;		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЉФ‚МЌЕ’бѓtѓЊЃ[ѓЂЉФЉuЃi€К’uЏгЏ‘‚«‚Й‚И‚йЏкЌ‡—p‚PЃj
-	const int space_sc3 = 30;		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЉФ‚МЌЕ’бѓtѓЊЃ[ѓЂЉФЉuЃi€К’uЏгЏ‘‚«‚Й‚И‚йЏкЌ‡—p‚QЃj
-	const int THRES_RATE1 = 300;	// –ѕЉm‚ИѓVЃ[ѓ“ѓ`ѓFѓ“ѓW”»’и—p‚Ми‡’l
-	const int THRES_RATE2 = 7;		// •П‰»‚И‚µ”»’и—p‚Ми‡’l
+	const int space_sc1  = 5;		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёй–“гЃ®жњЂдЅЋгѓ•гѓ¬гѓјгѓ й–“йљ”
+	const int space_sc2 = 10;		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёй–“гЃ®жњЂдЅЋгѓ•гѓ¬гѓјгѓ й–“йљ”пј€дЅЌзЅ®дёЉж›ёгЃЌгЃ«гЃЄг‚‹е ґеђ€з”Ёпј‘пј‰
+	const int space_sc3 = 30;		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёй–“гЃ®жњЂдЅЋгѓ•гѓ¬гѓјгѓ й–“йљ”пј€дЅЌзЅ®дёЉж›ёгЃЌгЃ«гЃЄг‚‹е ґеђ€з”Ёпј’пј‰
+	const int THRES_RATE1 = 300;	// жЋзўєгЃЄг‚·гѓјгѓігѓЃг‚§гѓіг‚ёе€¤е®љз”ЁгЃ®й–ѕеЂ¤
+	const int THRES_RATE2 = 7;		// е¤‰еЊ–гЃЄгЃ—е€¤е®љз”ЁгЃ®й–ѕеЂ¤
 	INPUT_INFO &vii = video->get_input_info();
-	int n = vii.n;					// ѓtѓЊЃ[ѓЂђ”
-	int ncount_sc = 0;				// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWђ”ѓJѓEѓ“ѓg
+	int n = vii.n;					// гѓ•гѓ¬гѓјгѓ ж•°
+	int ncount_sc = 0;				// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёж•°г‚«г‚¦гѓігѓ€
 
-	//--- ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЏо•сЏ‰Љъ‰» ---
-	int msel = 0;					// ‰Ѕ”Ф–Ъ‚МѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚©Ѓi0-Ѓj
-	int d_max_en[DEF_SCMAX];		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚М—LЊшђ«
-	int d_max_flagsc[DEF_SCMAX];	// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW”»’иѓtѓ‰ѓO
-	int d_max_pos[DEF_SCMAX];		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW’n“_ѓtѓЊЃ[ѓЂ”ФЌ†
-	int d_max_mvec[DEF_SCMAX];		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW’n“_“®‚«Џо•с
-	int d_maxp_mvec[DEF_SCMAX];		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚PѓtѓЊЃ[ѓЂ‘O“®‚«Џо•с
-	int d_maxn_mvec[DEF_SCMAX];		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚PѓtѓЊЃ[ѓЂЊг“®‚«Џо•с
-	int d_max_mvec2[DEF_SCMAX];		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW’n“_ѓCѓ“ѓ^Ѓ[ѓЊЃ[ѓX—p“®‚«Џо•с
-	int d_maxp_mvec2[DEF_SCMAX];	// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚PѓtѓЊЃ[ѓЂ‘OѓCѓ“ѓ^Ѓ[ѓЊЃ[ѓX—p“®‚«Џо•с
-	int d_maxn_mvec2[DEF_SCMAX];	// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚PѓtѓЊЃ[ѓЂЊгѓCѓ“ѓ^Ѓ[ѓЊЃ[ѓX—p“®‚«Џо•с
-	int d_max_scrate[DEF_SCMAX];	// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW’n“_‚МѓVЃ[ѓ“ѓ`ѓFѓ“ѓW”»’и’lЃi0-100Ѓj
+	//--- г‚·гѓјгѓігѓЃг‚§гѓіг‚ёжѓ…е ±е€ќжњџеЊ– ---
+	int msel = 0;					// дЅ•з•Єз›®гЃ®г‚·гѓјгѓігѓЃг‚§гѓіг‚ёгЃ‹пј€0-пј‰
+	int d_max_en[DEF_SCMAX];		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёгЃ®жњ‰еЉ№жЂ§
+	int d_max_flagsc[DEF_SCMAX];	// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёе€¤е®љгѓ•гѓ©г‚°
+	int d_max_pos[DEF_SCMAX];		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёењ°з‚№гѓ•гѓ¬гѓјгѓ з•ЄеЏ·
+	int d_max_mvec[DEF_SCMAX];		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёењ°з‚№е‹•гЃЌжѓ…е ±
+	int d_maxp_mvec[DEF_SCMAX];		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёпј‘гѓ•гѓ¬гѓјгѓ е‰Ќе‹•гЃЌжѓ…е ±
+	int d_maxn_mvec[DEF_SCMAX];		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёпј‘гѓ•гѓ¬гѓјгѓ еѕЊе‹•гЃЌжѓ…е ±
+	int d_max_mvec2[DEF_SCMAX];		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёењ°з‚№г‚¤гѓіг‚їгѓјгѓ¬гѓјг‚№з”Ёе‹•гЃЌжѓ…е ±
+	int d_maxp_mvec2[DEF_SCMAX];	// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёпј‘гѓ•гѓ¬гѓјгѓ е‰Ќг‚¤гѓіг‚їгѓјгѓ¬гѓјг‚№з”Ёе‹•гЃЌжѓ…е ±
+	int d_maxn_mvec2[DEF_SCMAX];	// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёпј‘гѓ•гѓ¬гѓјгѓ еѕЊг‚¤гѓіг‚їгѓјгѓ¬гѓјг‚№з”Ёе‹•гЃЌжѓ…е ±
+	int d_max_scrate[DEF_SCMAX];	// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёењ°з‚№гЃ®г‚·гѓјгѓігѓЃг‚§гѓіг‚ёе€¤е®љеЂ¤пј€0-100пј‰
 
 	for(int k=0; k<DEF_SCMAX; k++){
 		d_max_en[k]     = 0;
 		d_max_flagsc[k] = 0;
 	}
 
-	//--- ЊВ•КѓVЃ[ѓ“ѓ`ѓFѓ“ѓW€К’uЏо•сЋж“ѕ ---
+	//--- еЂ‹е€Ґг‚·гѓјгѓігѓЃг‚§гѓіг‚ёдЅЌзЅ®жѓ…е ±еЏ–еѕ— ---
 	{
-		//--- €К’uЏо•сђЭ’и ---
-		int range_start_fr = start_fr - extendmute - 1;			// ЊvЋZЉJЋnѓtѓЊЃ[ѓЂ
-		int valid_start_fr = start_fr - extendmute;				// ЊџЌхЉJЋnѓtѓЊЃ[ѓЂ
-		int range_end_fr   = start_fr + seri + extendmute + 1;	// ЊvЋZЏI—№ѓtѓЊЃ[ѓЂ
-		int valid_end_fr   = start_fr + seri + extendmute;		// ЊџЌхЏI—№ѓtѓЊЃ[ѓЂ
+		//--- дЅЌзЅ®жѓ…е ±иЁ­е®љ ---
+		int range_start_fr = start_fr - extendmute - 1;			// иЁ€з®—й–‹е§‹гѓ•гѓ¬гѓјгѓ 
+		int valid_start_fr = start_fr - extendmute;				// ж¤њзґўй–‹е§‹гѓ•гѓ¬гѓјгѓ 
+		int range_end_fr   = start_fr + seri + extendmute + 1;	// иЁ€з®—зµ‚дє†гѓ•гѓ¬гѓјгѓ 
+		int valid_end_fr   = start_fr + seri + extendmute;		// ж¤њзґўзµ‚дє†гѓ•гѓ¬гѓјгѓ 
 		if (range_start_fr < 0){
 			range_start_fr = 0;
 		}
@@ -402,89 +410,89 @@ int proc_scene_change(
 			valid_end_fr = n-1;
 		}
 
-		//--- ‘O‰с€К’uЏо•сЋж“ѕ ---
+		//--- е‰Ќе›ћдЅЌзЅ®жѓ…е ±еЏ–еѕ— ---
 		int last_fr = range_start_fr - 1;
 		if (last_fr < 0){
 			last_fr = 0;
 		}
 		video->read_video_y8(last_fr, pix0);
 
-		//--- ѓЌЃ[ѓJѓ‹•Пђ” ---
-		int local_end_fr;				// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЉm’иѓtѓЊЃ[ѓЂ€К’u
-		int local_cntsc;				// Ћw’иЉъЉФ“аѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‰сђ”
-		int pos_lastchange;				// ‘O‰с•П‰»€К’u
-		int skip_update;				// A‘±ѓtѓЊЃ[ѓЂѓVЃ[ѓ“ѓ`ѓFѓ“ѓW–іЋ‹—p
-		int cmvec;						// ѓCѓ“ѓ^Ѓ[ѓЊЃ[ѓX‚М“®‚«‘Ѕ‚ў‘¤Ћж“ѕ—p
-		int cmvec2;						// ѓCѓ“ѓ^Ѓ[ѓЊЃ[ѓX‚М“®‚«Џ­‚И‚ў‘¤Ћж“ѕ—p
-		int rate_sc;					// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW”»’и’lЃiflag_sc‚МЊі‚Ж‚И‚й’lЃj
-		int flag_sc;					// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW”»’иѓtѓ‰ѓO
-		int flag_sc_hold = 0;			// •ЫЋќѓVЃ[ѓ“ѓ`ѓFѓ“ѓW”»’иѓtѓ‰ѓO
-		int last_cmvec  = 0;			// ‘OѓtѓЊЃ[ѓЂ‚М“®‚«Џо•с‹L‰Ї—p
-		int last_cmvec2 = 0;			// ‘OѓtѓЊЃ[ѓЂ‚МѓCѓ“ѓ^Ѓ[ѓЊЃ[ѓX—p“®‚«Џо•с‹L‰Ї—p
-		int last_rate = 0;				// ’ј‘O‚МѓVЃ[ѓ“ѓ`ѓFѓ“ѓW”»’и—М€ж’l
-		int keep_schk = 0;				// ’ј‘OѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚М•ЫЋќЉПЋ@ѓtѓ‰ѓO
-		int keep_msel = 0;				// ’ј‘OѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚М•ЫЋќ€К’u
+		//--- гѓ­гѓјг‚«гѓ«е¤‰ж•° ---
+		int local_end_fr;				// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёзўєе®љгѓ•гѓ¬гѓјгѓ дЅЌзЅ®
+		int local_cntsc;				// жЊ‡е®љжњџй–“е†…г‚·гѓјгѓігѓЃг‚§гѓіг‚ёе›ћж•°
+		int pos_lastchange;				// е‰Ќе›ће¤‰еЊ–дЅЌзЅ®
+		int skip_update;				// йЂЈз¶љгѓ•гѓ¬гѓјгѓ г‚·гѓјгѓігѓЃг‚§гѓіг‚ёз„Ўи¦–з”Ё
+		int cmvec;						// г‚¤гѓіг‚їгѓјгѓ¬гѓјг‚№гЃ®е‹•гЃЌе¤љгЃ„еЃґеЏ–еѕ—з”Ё
+		int cmvec2;						// г‚¤гѓіг‚їгѓјгѓ¬гѓјг‚№гЃ®е‹•гЃЌе°‘гЃЄгЃ„еЃґеЏ–еѕ—з”Ё
+		int rate_sc;					// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёе€¤е®љеЂ¤пј€flag_scгЃ®е…ѓгЃЁгЃЄг‚‹еЂ¤пј‰
+		int flag_sc;					// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёе€¤е®љгѓ•гѓ©г‚°
+		int flag_sc_hold = 0;			// дїќжЊЃг‚·гѓјгѓігѓЃг‚§гѓіг‚ёе€¤е®љгѓ•гѓ©г‚°
+		int last_cmvec  = 0;			// е‰Ќгѓ•гѓ¬гѓјгѓ гЃ®е‹•гЃЌжѓ…е ±иЁж†¶з”Ё
+		int last_cmvec2 = 0;			// е‰Ќгѓ•гѓ¬гѓјгѓ гЃ®г‚¤гѓіг‚їгѓјгѓ¬гѓјг‚№з”Ёе‹•гЃЌжѓ…е ±иЁж†¶з”Ё
+		int last_rate = 0;				// з›ґе‰ЌгЃ®г‚·гѓјгѓігѓЃг‚§гѓіг‚ёе€¤е®љй еџџеЂ¤
+		int keep_schk = 0;				// з›ґе‰Ќг‚·гѓјгѓігѓЃг‚§гѓіг‚ёгЃ®дїќжЊЃи¦іеЇџгѓ•гѓ©г‚°
+		int keep_msel = 0;				// з›ґе‰Ќг‚·гѓјгѓігѓЃг‚§гѓіг‚ёгЃ®дїќжЊЃдЅЌзЅ®
 
-		//--- ЊџЌхЉJЋn‘OђЭ’и ---
-		local_cntsc = 0;						// Ћw’иЉъЉФ“аѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‰сђ”
-		local_end_fr = start_fr + breakmute;	// Ћџ‚МѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЉm’иѓtѓЊЃ[ѓЂЋw’и
-		pos_lastchange = -space_sc1;			// ‘O‰с•П‰»€К’u
-		if (*lastmute_scpos > 0){				// ‘O‰сѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚Є‘¶ЌЭ‚·‚йЏкЌ‡
-			pos_lastchange = *lastmute_scpos;	// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW’јЊг‚НЉФЉu‚р‚ ‚Ї‚й‚Ѕ‚Я
+		//--- ж¤њзґўй–‹е§‹е‰ЌиЁ­е®љ ---
+		local_cntsc = 0;						// жЊ‡е®љжњџй–“е†…г‚·гѓјгѓігѓЃг‚§гѓіг‚ёе›ћж•°
+		local_end_fr = start_fr + breakmute;	// ж¬ЎгЃ®г‚·гѓјгѓігѓЃг‚§гѓіг‚ёзўєе®љгѓ•гѓ¬гѓјгѓ жЊ‡е®љ
+		pos_lastchange = -space_sc1;			// е‰Ќе›ће¤‰еЊ–дЅЌзЅ®
+		if (*lastmute_scpos > 0){				// е‰Ќе›ћг‚·гѓјгѓігѓЃг‚§гѓіг‚ёгЃЊе­ењЁгЃ™г‚‹е ґеђ€
+			pos_lastchange = *lastmute_scpos;	// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёз›ґеѕЊгЃЇй–“йљ”г‚’гЃ‚гЃ‘г‚‹гЃџг‚Ѓ
 		}
 
-		//--- ЉeѓtѓЊЃ[ѓЂ‰ж‘њѓfЃ[ѓ^‚©‚зѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЏо•с‚рЋж“ѕ ---
+		//--- еђ„гѓ•гѓ¬гѓјгѓ з”»еѓЏгѓ‡гѓјг‚їгЃ‹г‚‰г‚·гѓјгѓігѓЃг‚§гѓіг‚ёжѓ…е ±г‚’еЏ–еѕ— ---
 		for (int x=range_start_fr; x<=range_end_fr; x++) {
-			//--- ѓfЃ[ѓ^Ћж“ѕ ---
+			//--- гѓ‡гѓјг‚їеЏ–еѕ— ---
 			video->read_video_y8(x, pix1);
 			rate_sc = mvec( &cmvec, &cmvec2, &flag_sc, pix1, pix0, w, h, (100-0)*(100/FIELD_PICTURE), FIELD_PICTURE, x);
 			if (d_max_en[msel] > 0){
-				if (x == d_max_pos[msel]+1){			// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚PѓtѓЊЃ[ѓЂЊг‚М“®‚«Џо•сЌXђV
+				if (x == d_max_pos[msel]+1){			// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёпј‘гѓ•гѓ¬гѓјгѓ еѕЊгЃ®е‹•гЃЌжѓ…е ±ж›ґж–°
 					d_maxn_mvec[msel]  = cmvec;
 					d_maxn_mvec2[msel] = cmvec2;
 				}
 			}
-			//--- ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЉi”[Џ€—ќ ---
-			if (msel < DEF_SCMAX-1){							// ”z—с‚Є–„‚Ь‚Б‚Д‚ў‚И‚ў‚±‚Ж‘O’с
-				if (flag_sc_hold > 0){							// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЊџЏoђШ‚и‘Ц‚¦’n“_
-					if (local_cntsc < 1){						// Њ»’n“_‚рЋc‚µ‚Д‚і‚з‚ЙЊу•в’З‰Б‰В”\‚ИЋћ
+			//--- г‚·гѓјгѓігѓЃг‚§гѓіг‚ёж јзґЌе‡¦зђ† ---
+			if (msel < DEF_SCMAX-1){							// й…Ќе€—гЃЊеџ‹гЃѕгЃЈгЃ¦гЃ„гЃЄгЃ„гЃ“гЃЁе‰ЌжЏђ
+				if (flag_sc_hold > 0){							// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёж¤ње‡єе€‡г‚Љж›їгЃ€ењ°з‚№
+					if (local_cntsc < 1){						// зЏѕењ°з‚№г‚’ж®‹гЃ—гЃ¦гЃ•г‚‰гЃ«еЂ™иЈњиїЅеЉ еЏЇиѓЅгЃЄж™‚
 						local_cntsc ++;
 						msel ++;
 						flag_sc_hold = 0;
 					}
 				}
-				if (x >= local_end_fr){			// Ћw’иЉъЉФ–і‰№‚Є‘±‚ў‚ЅЏкЌ‡
-					if (local_cntsc == 0 && d_max_en[msel] > 0){	// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚Є‚И‚©‚Б‚Ѕ‚зЉm’и
+				if (x >= local_end_fr){			// жЊ‡е®љжњџй–“з„ЎйџігЃЊз¶љгЃ„гЃџе ґеђ€
+					if (local_cntsc == 0 && d_max_en[msel] > 0){	// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёгЃЊгЃЄгЃ‹гЃЈгЃџг‚‰зўєе®љ
 						msel ++;
 					}
-					else if (flag_sc_hold > 0){		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЉm’и
+					else if (flag_sc_hold > 0){		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёзўєе®љ
 						msel ++;
 					}
 					else{
 						d_max_en[msel] = 0;
 					}
-					local_end_fr += breakmute;	// Ћџ‚МѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЉm’иѓtѓЊЃ[ѓЂЋw’и
-					local_cntsc = 0;			// Ћw’иЉъЉФ“аѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‰сђ”
+					local_end_fr += breakmute;	// ж¬ЎгЃ®г‚·гѓјгѓігѓЃг‚§гѓіг‚ёзўєе®љгѓ•гѓ¬гѓјгѓ жЊ‡е®љ
+					local_cntsc = 0;			// жЊ‡е®љжњџй–“е†…г‚·гѓјгѓігѓЃг‚§гѓіг‚ёе›ћж•°
 					flag_sc_hold = 0;
 				}
 			}
-			//--- ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW”»’иЏ€—ќ ---
-			if (x < valid_start_fr || x > valid_end_fr){		// ЊџЌх”Н€НЉO
+			//--- г‚·гѓјгѓігѓЃг‚§гѓіг‚ёе€¤е®ље‡¦зђ† ---
+			if (x < valid_start_fr || x > valid_end_fr){		// ж¤њзґўзЇ„е›Іе¤–
 			}
 			else{
-				//--- ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЏгЏ‘‚«‚Й‚И‚йЏкЌ‡‚МЋАЌs‚р”»•К ---
-				if (flag_sc > 0 && d_max_flagsc[msel] > 0){			// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚ ‚и‚ЕЏгЏ‘‚«‚Й‚И‚йЏкЌ‡
+				//--- г‚·гѓјгѓігѓЃг‚§гѓіг‚ёдёЉж›ёгЃЌгЃ«гЃЄг‚‹е ґеђ€гЃ®е®џиЎЊг‚’е€¤е€Ґ ---
+				if (flag_sc > 0 && d_max_flagsc[msel] > 0){			// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёгЃ‚г‚ЉгЃ§дёЉж›ёгЃЌгЃ«гЃЄг‚‹е ґеђ€
 //					printf("overwrite %d,%d,%d -> %d,%d,%d\n", d_max_pos[msel], d_max_mvec[msel], d_max_scrate[msel], x, cmvec, rate_sc);
-					if (abs(x - d_max_pos[msel]) <= space_sc2){ 	// ЏгЏ‘‚«‘O‚М€К’u‚©‚зЉФЉu‚Є’Z‚ўЏкЌ‡
-						if (d_max_scrate[msel] >= THRES_RATE1 ||	// ‘O‰с’n“_‚М‰ж–К“]Љ·Љ„Ќ‡‚Є‘е‚«‚ўЏкЌ‡–іЊш‰»
-							rate_sc < THRES_RATE1 ||				// ЌЎ‰с’n“_‚М‰ж–К“]Љ·Љ„Ќ‡‚ЄЏ¬‚і‚ўЏкЌ‡–іЊш‰»
-							last_rate * 2 > rate_sc){				// ‘O‰ж–К‚©‚з•П‰»‚Є‘е‚«‚­‚И‚ўЏкЌ‡–іЊш‰»
+					if (abs(x - d_max_pos[msel]) <= space_sc2){ 	// дёЉж›ёгЃЌе‰ЌгЃ®дЅЌзЅ®гЃ‹г‚‰й–“йљ”гЃЊзџ­гЃ„е ґеђ€
+						if (d_max_scrate[msel] >= THRES_RATE1 ||	// е‰Ќе›ћењ°з‚№гЃ®з”»йќўи»ўжЏ›е‰Іеђ€гЃЊе¤§гЃЌгЃ„е ґеђ€з„ЎеЉ№еЊ–
+							rate_sc < THRES_RATE1 ||				// д»Ље›ћењ°з‚№гЃ®з”»йќўи»ўжЏ›е‰Іеђ€гЃЊе°ЏгЃ•гЃ„е ґеђ€з„ЎеЉ№еЊ–
+							last_rate * 2 > rate_sc){				// е‰Ќз”»йќўгЃ‹г‚‰е¤‰еЊ–гЃЊе¤§гЃЌгЃЏгЃЄгЃ„е ґеђ€з„ЎеЉ№еЊ–
 							flag_sc = 0;
 						}
 					}
-					if (abs(x - d_max_pos[msel]) <= space_sc3){		// ЏгЏ‘‚«‘O‚М€К’u‚©‚зЉФЉu‚ЄЋw’и“а‚МЏкЌ‡
-						if (d_max_scrate[msel] > rate_sc ||			// ‘O‰с‚ж‚и‰ж–К“]Љ·Љ„Ќ‡‚ЄЏ¬‚і‚ўЏкЌ‡–іЊш‰»
-							last_rate * 2 > rate_sc){				// ‘O‰ж–К‚©‚з•П‰»‚Є‘е‚«‚­‚И‚ўЏкЌ‡–іЊш‰»
+					if (abs(x - d_max_pos[msel]) <= space_sc3){		// дёЉж›ёгЃЌе‰ЌгЃ®дЅЌзЅ®гЃ‹г‚‰й–“йљ”гЃЊжЊ‡е®ље†…гЃ®е ґеђ€
+						if (d_max_scrate[msel] > rate_sc ||			// е‰Ќе›ћг‚€г‚Љз”»йќўи»ўжЏ›е‰Іеђ€гЃЊе°ЏгЃ•гЃ„е ґеђ€з„ЎеЉ№еЊ–
+							last_rate * 2 > rate_sc){				// е‰Ќз”»йќўгЃ‹г‚‰е¤‰еЊ–гЃЊе¤§гЃЌгЃЏгЃЄгЃ„е ґеђ€з„ЎеЉ№еЊ–
 							flag_sc = 0;
 						}
 					}
@@ -492,32 +500,32 @@ int proc_scene_change(
 //if (x > 50108 && x < 50118){
 //printf("(%d %d %d %d %d)\n", x, flag_sc, rate_sc, last_rate, pos_lastchange);
 //}
-				//--- ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW’јЊг‚МЌДѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЋАЌs‚р”»•К ---
-				// Њґ‘ҐѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЊџЏo’јЊг‚НA‘±‚Е•ЫЋќ‚µ‚И‚ў‚ж‚¤ЉФЉu‚р‚ ‚Ї‚й
+				//--- г‚·гѓјгѓігѓЃг‚§гѓіг‚ёз›ґеѕЊгЃ®е†Ќг‚·гѓјгѓігѓЃг‚§гѓіг‚ёе®џиЎЊг‚’е€¤е€Ґ ---
+				// еЋџе‰‡г‚·гѓјгѓігѓЃг‚§гѓіг‚ёж¤ње‡єз›ґеѕЊгЃЇйЂЈз¶љгЃ§дїќжЊЃгЃ—гЃЄгЃ„г‚€гЃ†й–“йљ”г‚’гЃ‚гЃ‘г‚‹
 				skip_update = 0;
 				if (abs(x - pos_lastchange) <= space_sc1 &&
-					x - pos_lastchange != 0){					// ‘O‰сѓVЃ[ѓ“ѓ`ѓFѓ“ѓW•t‹Я‚МѓtѓЊЃ[ѓЂ‚Н
-					skip_update = 1;							// A‘±‚Е•ЫЋќ‚µ‚И‚ўЃi•WЏЂђЭ’иЃj
-					if (keep_schk > 0){							// Ќ·‚µ‘Ц‚¦‰В”\ђ«‚©‚зЉПЋ@•K—vЋћ
-						if (flag_sc > 0 &&						// ЌЎ‰с‚аѓVЃ[ѓ“ѓ`ѓFѓ“ѓW
-							rate_sc >= THRES_RATE1 &&			// ‰ж–К“]Љ·Љ„Ќ‡‚Є‘е‚«‚ў
-							d_max_scrate[keep_msel] * 2 <= rate_sc &&	// ‘O‰с’n“_‚ж‚и‚Н‚й‚©‚Й•П‰»‘е
-							last_rate * 3 <= rate_sc){			// ‘O‰ж–К‚ж‚и‚Н‚й‚©‚Й•П‰»‘е
-							// Џг‹LЏрЊЏЋћ‚Н—бЉO‚Ж‚µ‚ДѓVЃ[ѓ“ѓ`ѓFѓ“ѓWђЭ’и‚рЌs‚¤ЃiЏгЏ‘‚«ђЭ’иЃj
+					x - pos_lastchange != 0){					// е‰Ќе›ћг‚·гѓјгѓігѓЃг‚§гѓіг‚ёд»иї‘гЃ®гѓ•гѓ¬гѓјгѓ гЃЇ
+					skip_update = 1;							// йЂЈз¶љгЃ§дїќжЊЃгЃ—гЃЄгЃ„пј€жЁ™жє–иЁ­е®љпј‰
+					if (keep_schk > 0){							// е·®гЃ—ж›їгЃ€еЏЇиѓЅжЂ§гЃ‹г‚‰и¦іеЇџеї…и¦Ѓж™‚
+						if (flag_sc > 0 &&						// д»Ље›ћг‚‚г‚·гѓјгѓігѓЃг‚§гѓіг‚ё
+							rate_sc >= THRES_RATE1 &&			// з”»йќўи»ўжЏ›е‰Іеђ€гЃЊе¤§гЃЌгЃ„
+							d_max_scrate[keep_msel] * 2 <= rate_sc &&	// е‰Ќе›ћењ°з‚№г‚€г‚ЉгЃЇг‚‹гЃ‹гЃ«е¤‰еЊ–е¤§
+							last_rate * 3 <= rate_sc){			// е‰Ќз”»йќўг‚€г‚ЉгЃЇг‚‹гЃ‹гЃ«е¤‰еЊ–е¤§
+							// дёЉиЁжќЎд»¶ж™‚гЃЇдѕ‹е¤–гЃЁгЃ—гЃ¦г‚·гѓјгѓігѓЃг‚§гѓіг‚ёиЁ­е®љг‚’иЎЊгЃ†пј€дёЉж›ёгЃЌиЁ­е®љпј‰
 							skip_update = 0;
-							if (msel != keep_msel){				// ђЭ’и€К’u‚Є•П‚н‚Б‚Д‚ў‚Ѕ‚з–Я‚·
+							if (msel != keep_msel){				// иЁ­е®љдЅЌзЅ®гЃЊе¤‰г‚ЏгЃЈгЃ¦гЃ„гЃџг‚‰ж€»гЃ™
 								msel = keep_msel;
-								if (local_cntsc > 0){			// ѓJѓEѓ“ѓg‚а‘ќ‚¦‚Д‚ў‚Ѕ‚з–Я‚·
+								if (local_cntsc > 0){			// г‚«г‚¦гѓігѓ€г‚‚еў—гЃ€гЃ¦гЃ„гЃџг‚‰ж€»гЃ™
 									local_cntsc --;
 								}
 							}
 						}
 					}
 				}
-				else{											// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚©‚з—Ј‚к‚Ѕ‚з
-					keep_schk = 0;								// ЉПЋ@ЏI—№
+				else{											// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёгЃ‹г‚‰й›ўг‚ЊгЃџг‚‰
+					keep_schk = 0;								// и¦іеЇџзµ‚дє†
 				}
-				//--- ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЌXђVЏ€—ќ ---
+				//--- г‚·гѓјгѓігѓЃг‚§гѓіг‚ёж›ґж–°е‡¦зђ† ---
 				if (skip_update == 0){
 					int flag_rateup = 0;
 					if ((d_max_scrate[msel] < rate_sc && rate_sc >= THRES_RATE2) ||
@@ -527,7 +535,7 @@ int proc_scene_change(
 						flag_rateup = 1;
 					}
 					if ((d_max_flagsc[msel] == 0 && flag_rateup > 0)||
-							  d_max_en[msel] == 0 || flag_sc > 0) {		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW’n“_ЌXђV
+							  d_max_en[msel] == 0 || flag_sc > 0) {		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёењ°з‚№ж›ґж–°
 						d_max_en[msel]     = 1;
 						d_max_pos[msel]    = x;
 						d_max_mvec[msel]   = cmvec;
@@ -537,11 +545,11 @@ int proc_scene_change(
 						d_maxp_mvec2[msel] = last_cmvec2;
 						d_maxn_mvec2[msel] = 0;
 						d_max_scrate[msel] = rate_sc;
-						if (flag_sc > 0){			// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚ ‚и
+						if (flag_sc > 0){			// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёгЃ‚г‚Љ
 							flag_sc_hold = 1;
 							d_max_flagsc[msel] = 1;
-							pos_lastchange = x;						// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW’јЊг‚НЉФЉu‚р‚ ‚Ї‚й‚Ѕ‚Я€К’u•ЫЋќ
-							if (rate_sc < THRES_RATE1){				// ‰ж–К“]Љ·—К‚ЄЏ­‚И‚ўЋћ‚Нђ”ѓtѓЊЃ[ѓЂ—vЉПЋ@
+							pos_lastchange = x;						// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёз›ґеѕЊгЃЇй–“йљ”г‚’гЃ‚гЃ‘г‚‹гЃџг‚ЃдЅЌзЅ®дїќжЊЃ
+							if (rate_sc < THRES_RATE1){				// з”»йќўи»ўжЏ›й‡ЏгЃЊе°‘гЃЄгЃ„ж™‚гЃЇж•°гѓ•гѓ¬гѓјгѓ и¦Ѓи¦іеЇџ
 								keep_schk = 1;
 								keep_msel = msel;
 							}
@@ -549,7 +557,7 @@ int proc_scene_change(
 					}
 				}
 			}
-			//--- Ћџ‚МѓtѓЊЃ[ѓЂЏЂ”х ---
+			//--- ж¬ЎгЃ®гѓ•гѓ¬гѓјгѓ жє–е‚™ ---
 			unsigned char *tmp = pix0;
 			pix0 = pix1;
 			pix1 = tmp;
@@ -562,7 +570,7 @@ int proc_scene_change(
 //					}
 		}
 
-		// ‚Q‰УЏЉ–Ъ€ИЌ~‚ЕѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚Є‚И‚©‚Б‚Ѕ‚з–іЊш‰»
+		// пј’з®‡ж‰Ђз›®д»Ґй™ЌгЃ§г‚·гѓјгѓігѓЃг‚§гѓіг‚ёгЃЊгЃЄгЃ‹гЃЈгЃџг‚‰з„ЎеЉ№еЊ–
 		if (flag_sc_hold == 0 && msel > 0){
 			if (local_cntsc > 0 || (local_end_fr - breakmute + setseri > range_end_fr)){
 				d_max_en[msel] = 0;
@@ -570,21 +578,21 @@ int proc_scene_change(
 		}
 	}
 
-	//--- ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЏо•с‰БЌH ---
-	int d_maxpre_pos[DEF_SCMAX];		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‘O‚М€К’u
-	int d_maxrev_pos[DEF_SCMAX];		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЊг‚М€К’u
-	int msel_max = 0;					// ЌЕ‘е‚МѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‘I‘р
+	//--- г‚·гѓјгѓігѓЃг‚§гѓіг‚ёжѓ…е ±еЉ е·Ґ ---
+	int d_maxpre_pos[DEF_SCMAX];		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёе‰ЌгЃ®дЅЌзЅ®
+	int d_maxrev_pos[DEF_SCMAX];		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёеѕЊгЃ®дЅЌзЅ®
+	int msel_max = 0;					// жњЂе¤§гЃ®г‚·гѓјгѓігѓЃг‚§гѓіг‚ёйЃёжЉћ
 	{
 		// add for searching last frame before changing scene
-		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‘OЊг‚МѓtѓЊЃ[ѓЂ”ФЌ†‚рЋж“ѕЃiѓCѓ“ѓ^Ѓ[ѓЊЃ[ѓX•Р‘¤•П‰»’†‚рЉO‚·Ѓj
+		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёе‰ЌеѕЊгЃ®гѓ•гѓ¬гѓјгѓ з•ЄеЏ·г‚’еЏ–еѕ—пј€г‚¤гѓіг‚їгѓјгѓ¬гѓјг‚№з‰‡еЃґе¤‰еЊ–дё­г‚’е¤–гЃ™пј‰
 		for(int k=0; k<=msel; k++){
 			if (d_max_en[k] > 0){
-				d_maxpre_pos[k] = d_max_pos[k] - 1;		// ’КЏн‚Н‚PѓtѓЊЃ[ѓЂ‘O‚ЄѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‘O
+				d_maxpre_pos[k] = d_max_pos[k] - 1;		// йЂљеёёгЃЇпј‘гѓ•гѓ¬гѓјгѓ е‰ЌгЃЊг‚·гѓјгѓігѓЃг‚§гѓіг‚ёе‰Ќ
 				if (d_max_mvec[k] < d_maxp_mvec[k] * 2 && d_maxp_mvec[k] > d_maxp_mvec2[k] * 2 &&
 					d_max_mvec[k] - d_max_mvec2[k] > d_max_mvec[k] / 16){
 					d_maxpre_pos[k] = d_max_pos[k] - 2;
 				}
-				d_maxrev_pos[k] = d_max_pos[k];			// ’КЏн‚НѓVЃ[ѓ“ѓ`ѓFѓ“ѓW’n“_‚ЄѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЊг
+				d_maxrev_pos[k] = d_max_pos[k];			// йЂљеёёгЃЇг‚·гѓјгѓігѓЃг‚§гѓіг‚ёењ°з‚№гЃЊг‚·гѓјгѓігѓЃг‚§гѓіг‚ёеѕЊ
 				if (d_maxrev_pos[k] - d_maxpre_pos[k] < 2){
 					if (d_max_mvec[k] > d_max_mvec2[k] * 2 &&
 						d_max_mvec[k] < d_maxn_mvec[k] * 2 &&
@@ -601,9 +609,9 @@ int proc_scene_change(
 				}
 			}
 		}
-		// •Ўђ”Њу•в‚Є‚ ‚иЃA‚©‚В•П‰»‚М‚И‚ўѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚Є‚ ‚йЏкЌ‡‚НЌнЏњ
+		// и¤‡ж•°еЂ™иЈњгЃЊгЃ‚г‚ЉгЂЃгЃ‹гЃ¤е¤‰еЊ–гЃ®гЃЄгЃ„г‚·гѓјгѓігѓЃг‚§гѓіг‚ёгЃЊгЃ‚г‚‹е ґеђ€гЃЇе‰Љй™¤
 		if (msel >= 1){
-			// ЌЕ‘е•П‰»€К’uЉm”FЃimax_msel’l‚аЌXђVЃj
+			// жњЂе¤§е¤‰еЊ–дЅЌзЅ®зўєиЄЌпј€max_mselеЂ¤г‚‚ж›ґж–°пј‰
 			int d_tmpmax      = -1;
 			int rate_tmpmax   = -1;
 			for(int k=0; k<=msel; k++){
@@ -616,7 +624,7 @@ int proc_scene_change(
 					}
 				}
 			}
-			// ЌЕ‘е•П‰»€К’u‚рЏњ‚«ЃA•П‰»‚М‚И‚ўЊу•в‚НЌнЏњ
+			// жњЂе¤§е¤‰еЊ–дЅЌзЅ®г‚’й™¤гЃЌгЂЃе¤‰еЊ–гЃ®гЃЄгЃ„еЂ™иЈњгЃЇе‰Љй™¤
 			for(int k=0; k<=msel; k++){
 				if (d_max_en[k] > 0){
 					if (d_max_scrate[k] < THRES_RATE2 && k != msel_max){
@@ -626,7 +634,7 @@ int proc_scene_change(
 			}
 		}
 
-		// ЌЕЊг‚МѓVЃ[ѓ“ѓ`ѓFѓ“ѓW€К’u‚р‹L‰ЇЃiЋџ‚М–і‰№‹жЉФ‚МѓIЃ[ѓoЃ[ѓ‰ѓbѓvЊџЏo—pЃj
+		// жњЂеѕЊгЃ®г‚·гѓјгѓігѓЃг‚§гѓіг‚ёдЅЌзЅ®г‚’иЁж†¶пј€ж¬ЎгЃ®з„ЎйџіеЊєй–“гЃ®г‚Єгѓјгѓђгѓјгѓ©гѓѓгѓ—ж¤ње‡єз”Ёпј‰
 		int tmp_scpos = -1;
 		int tmp_flagsc = 0;
 		for(int k=0; k<=msel; k++){
@@ -637,7 +645,7 @@ int proc_scene_change(
 				}
 			}
 		}
-		if (tmp_flagsc > 0){			// ЌЕЊг‚Є–ѕЉm‚ИѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚ѕ‚Б‚ЅЋћ‚М‚ЭђЭ’и
+		if (tmp_flagsc > 0){			// жњЂеѕЊгЃЊжЋзўєгЃЄг‚·гѓјгѓігѓЃг‚§гѓіг‚ёгЃ гЃЈгЃџж™‚гЃ®гЃїиЁ­е®љ
 			*lastmute_scpos = tmp_scpos;
 		}
 		else{
@@ -645,13 +653,13 @@ int proc_scene_change(
 		}
 	}
 
-	//--- ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЏо•с•\Ћ¦—p ---
+	//--- г‚·гѓјгѓігѓЃг‚§гѓіг‚ёжѓ…е ±иЎЁз¤єз”Ё ---
 	{
-		// ’·ЋћЉФ–і‰№ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWђЭ’и•ќ‚Є‚ ‚й‚©Љm”F
-		int flag_force_sc = 0;			// Ћw’иЉъЉФ“а‚Е‹­ђ§“I‚ЙѓVЃ[ѓ“ѓ`ѓFѓ“ѓW‚рЌs‚Б‚Ѕ‚©
-		if (msel > 0){		// ‚Q‚В€ИЏг‚МЉФЉu
-			int msel_s = -1;			// ЌЕЏ‰‚М—LЊш”ФЌ†
-			int msel_e = -1;			// ЌЕЊг‚М—LЊш”ФЌ†
+		// й•·ж™‚й–“з„Ўйџіг‚·гѓјгѓігѓЃг‚§гѓіг‚ёиЁ­е®ље№…гЃЊгЃ‚г‚‹гЃ‹зўєиЄЌ
+		int flag_force_sc = 0;			// жЊ‡е®љжњџй–“е†…гЃ§еј·е€¶зљ„гЃ«г‚·гѓјгѓігѓЃг‚§гѓіг‚ёг‚’иЎЊгЃЈгЃџгЃ‹
+		if (msel > 0){		// пј’гЃ¤д»ҐдёЉгЃ®й–“йљ”
+			int msel_s = -1;			// жњЂе€ќгЃ®жњ‰еЉ№з•ЄеЏ·
+			int msel_e = -1;			// жњЂеѕЊгЃ®жњ‰еЉ№з•ЄеЏ·
 			for(int k=0; k<=msel; k++){
 				if (d_max_en[k] > 0){
 					msel_e = k;
@@ -665,100 +673,100 @@ int proc_scene_change(
 			}
 		}
 
-		// ѓ}Ѓ[ѓN“а—e‚Ж€К’u‚рЊ€‚Я‚й
+		// гѓћгѓјг‚Їе†…е®№гЃЁдЅЌзЅ®г‚’ж±єг‚Ѓг‚‹
 		int msel_mark = msel_max;
 		int msel_mknext  = msel_max;
 		int mark_type = 0;
 		int difmin = 30;
 		int last_frame;
-		if (*lastmute_marker < 0){					// ЌЕЏ‰‚М–і‰№‚М‘O‰с‚Н–іЊш
+		if (*lastmute_marker < 0){					// жњЂе€ќгЃ®з„ЎйџігЃ®е‰Ќе›ћгЃЇз„ЎеЉ№
 			last_frame = -10000;
 		}
 		else{
 			last_frame = *lastmute_marker;
 		}
 		for(int k=0; k<=msel; k++){
-			if (d_max_en[k] == 0) continue;		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЊу•в‚©‚зЉO‚к‚ЅЏкЌ‡Ћџ‚Й
+			if (d_max_en[k] == 0) continue;		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёеЂ™иЈњгЃ‹г‚‰е¤–г‚ЊгЃџе ґеђ€ж¬ЎгЃ«
 			int dif = abs(d_max_pos[k] - last_frame - 30*15);
 			if (dif < difmin){
 				difmin = dif;
 				msel_mark = k;
-				mark_type = 15;				// 15•bЉФЉu
+				mark_type = 15;				// 15з§’й–“йљ”
 			}
 			dif = abs(d_max_pos[k] - last_frame - 30*30);
 			if (dif < difmin){
 				difmin = dif;
 				msel_mark = k;
-				mark_type = 30;				// 30•bЉФЉu
+				mark_type = 30;				// 30з§’й–“йљ”
 			}
 			dif = abs(d_max_pos[k] - last_frame - 30*45);
 			if (dif < difmin){
 				difmin = dif;
 				msel_mark = k;
-				mark_type = 45;				// 45•bЉФЉu
+				mark_type = 45;				// 45з§’й–“йљ”
 			}
 			dif = abs(d_max_pos[k] - last_frame - 30*60);
 			if (dif < difmin){
 				difmin = dif;
 				msel_mark = k;
-				mark_type = 60;				// 60•bЉФЉu
+				mark_type = 60;				// 60з§’й–“йљ”
 			}
-			if (k == msel_mark){			// ѓ}Ѓ[ѓN€К’uЌXђVЋћ
-				msel_mknext = k;			// Ћџѓ}Ѓ[ѓN‹N“_‚а“Ї—l‚ЙЌXђV
+			if (k == msel_mark){			// гѓћгѓјг‚ЇдЅЌзЅ®ж›ґж–°ж™‚
+				msel_mknext = k;			// ж¬Ўгѓћгѓјг‚Їиµ·з‚№г‚‚еђЊж§гЃ«ж›ґж–°
 			}
-			if (seri > breakmute){			// –і‰№ЉъЉФ‚Є’·‚ўЏкЌ‡
-				if (k > msel_mark){			// ѓ}Ѓ[ѓN‚©‚з—Ј‚к‚Д‚ў‚йЏкЌ‡
+			if (seri > breakmute){			// з„Ўйџіжњџй–“гЃЊй•·гЃ„е ґеђ€
+				if (k > msel_mark){			// гѓћгѓјг‚ЇгЃ‹г‚‰й›ўг‚ЊгЃ¦гЃ„г‚‹е ґеђ€
 					if (abs(d_max_pos[k] - d_max_pos[msel_mark]) > breakmute){
-						msel_mknext = k;	// Ћџѓ}Ѓ[ѓN‹N“_‚НЌЕЊг‚М€К’u
+						msel_mknext = k;	// ж¬Ўгѓћгѓјг‚Їиµ·з‚№гЃЇжњЂеѕЊгЃ®дЅЌзЅ®
 					}
 				}
 			}
 		}
 
-		//--- Њ‹‰К•\Ћ¦ ---
+		//--- зµђжћњиЎЁз¤є ---
 		for(int k=0; k<=msel; k++){
-			char *mark = "";
-			if (d_max_en[k] == 0) continue;		// ѓVЃ[ѓ“ѓ`ѓFѓ“ѓWЊу•в‚©‚зЉO‚к‚ЅЏкЌ‡Ћџ‚Й
+			const char *mark = "";
+			if (d_max_en[k] == 0) continue;		// г‚·гѓјгѓігѓЃг‚§гѓіг‚ёеЂ™иЈњгЃ‹г‚‰е¤–г‚ЊгЃџе ґеђ€ж¬ЎгЃ«
 
-			if (d_max_scrate[k] < THRES_RATE2){	// ‘S‚­•П‰»‚М‚И‚ўѓVЃ[ѓ“ѓ`ѓFѓ“ѓW
-				mark = "ЃQ";
+			if (d_max_scrate[k] < THRES_RATE2){	// е…ЁгЃЏе¤‰еЊ–гЃ®гЃЄгЃ„г‚·гѓјгѓігѓЃг‚§гѓіг‚ё
+				mark = "пјї";
 			}
-			else if ((flag_force_sc > 0 && (k != msel_mark || mark_type == 0)) ||	// Ћw’и–і‰№‹жЉФ“аѓVЃ[ѓ“ѓ`ѓFѓ“ѓW’n“_
-					  (d_max_scrate[k] < THRES_RATE2 && k != msel_max)){			// “®‚«‚И‚µ‚ЕЋc‚Б‚Д‚ў‚йЏкЌ‡
-				mark = "Ѓ›";
+			else if ((flag_force_sc > 0 && (k != msel_mark || mark_type == 0)) ||	// жЊ‡е®љз„ЎйџіеЊєй–“е†…г‚·гѓјгѓігѓЃг‚§гѓіг‚ёењ°з‚№
+					  (d_max_scrate[k] < THRES_RATE2 && k != msel_max)){			// е‹•гЃЌгЃЄгЃ—гЃ§ж®‹гЃЈгЃ¦гЃ„г‚‹е ґеђ€
+				mark = "в—‹";
 			}
 			else if (k == msel_mark){
 				if (idx > 1 && mark_type == 15) {
-					mark = "Ѓљ";
+					mark = "в…";
 				} else if (idx > 1 && mark_type == 30) {
-					mark = "ЃљЃљ";
+					mark = "в…в…";
 				} else if (idx > 1 && mark_type == 45) {
-					mark = "ЃљЃљЃљ";
+					mark = "в…в…в…";
 				} else if (idx > 1 && mark_type == 60) {
-					mark = "ЃљЃљЃљЃљ";
+					mark = "в…в…в…в…";
 				}
 			}
-			else{	// –і‰№‹жЉФ“а‚Е‘ж2Њу•вѓVЃ[ѓ“ѓ`ѓFѓ“ѓW
-					mark = "Ѓ—";
+			else{	// з„ЎйџіеЊєй–“е†…гЃ§з¬¬2еЂ™иЈњг‚·гѓјгѓігѓЃг‚§гѓіг‚ё
+					mark = "пј ";
 			}
 			printf("\t SCPos: %d %s\n", d_max_pos[k], mark);
 			ncount_sc ++;
 
-			TCHAR title[256];
-			sprintf_s(title, _T("%dѓtѓЊЃ[ѓЂ %s SCPos:%d %d"), seri, mark, d_maxrev_pos[k], d_maxpre_pos[k]);
+			char title[256];
+			sprintf_s(title, "%dгѓ•гѓ¬гѓјгѓ  %s SCPos:%d %d", seri, mark, d_maxrev_pos[k], d_maxpre_pos[k]);
 			if (debug == 0){		// normal
 				write_chapter(fout, idx, start_fr, title, &vii);
 			}
 			else{					// for debug
-				TCHAR tmp_title[256];
-				sprintf_s(tmp_title, _T(" Rate:%d"), d_max_scrate[k]);
+				char tmp_title[256];
+				sprintf_s(tmp_title, " Rate:%d", d_max_scrate[k]);
 				strcat(title, tmp_title);
-//				sprintf_s(tmp_title, _T(" : [%d %d] [%d %d] [%d %d]"), d_maxn_mvec[k], d_maxn_mvec2[k], d_max_mvec[k], d_max_mvec2[k], d_maxp_mvec[k], d_maxp_mvec2[k]);
+//				sprintf_s(tmp_title, " : [%d %d] [%d %d] [%d %d]"), d_maxn_mvec[k], d_maxn_mvec2[k], d_max_mvec[k], d_max_mvec2[k], d_maxp_mvec[k], d_maxp_mvec2[k]);
 //				strcat(title, tmp_title);
 				write_chapter_debug(fout, idx, start_fr, title, &vii);
 			}
 		}
 		*lastmute_marker = d_max_pos[msel_mknext];
 	}
-	return ncount_sc;			// ЊџЏo‚µ‚Ѕ€К’u‚МЌ‡Њv‚р•Ф‚·
+	return ncount_sc;			// ж¤ње‡єгЃ—гЃџдЅЌзЅ®гЃ®еђ€иЁ€г‚’иї”гЃ™
 }

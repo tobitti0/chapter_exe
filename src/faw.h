@@ -1,15 +1,20 @@
-#pragma once
+#ifndef __FAW__
+#define __FAW__
+#include "compat.h"
+#include "source.h"
 
-#include "stdafx.h"
-
-// FAWƒ`ƒFƒbƒN‚ÆAFAWPreview.auf‚ğg‚Á‚Ä‚Ì1ƒtƒŒ[ƒ€ƒfƒR[ƒh
+// FAWãƒã‚§ãƒƒã‚¯ã¨ã€FAWPreview.aufã‚’ä½¿ã£ã¦ã®1ãƒ•ãƒ¬ãƒ¼ãƒ ãƒ‡ã‚³ãƒ¼ãƒ‰
 class CFAW {
 	bool is_half;
 
 	bool load_failed;
-	HMODULE _h;
+	void* _h;
 
+#ifdef _WIN32
 	typedef int (__stdcall *ExtractDecode1FAW)(const short *in, int samples, short *out, bool is_half);
+#else
+	typedef int (*ExtractDecode1FAW)(const short *in, int samples, short *out, bool is_half);
+#endif
 	ExtractDecode1FAW _ExtractDecode1FAW;
 
 	bool load() {
@@ -43,10 +48,10 @@ public:
 		return load_failed;
 	}
 
-	// FAWŠJn’n“_‚ğ’T‚·B1/2‚ÈFAW‚ªŒ©‚Â‚©‚ê‚ÎAˆÈ~‚Í‚»‚ê‚µ‚©’T‚³‚È‚¢B
-	// in: get_audio()‚Å“¾‚½‰¹ºƒf[ƒ^
-	// samples: get_audio() * ch”
-	// –ß‚è’lFFAWŠJnˆÊ’u‚ÌƒCƒ“ƒfƒbƒNƒXB‚È‚¯‚ê‚Î-1
+	// FAWé–‹å§‹åœ°ç‚¹ã‚’æ¢ã™ã€‚1/2ãªFAWãŒè¦‹ã¤ã‹ã‚Œã°ã€ä»¥é™ã¯ãã‚Œã—ã‹æ¢ã•ãªã„ã€‚
+	// in: get_audio()ã§å¾—ãŸéŸ³å£°ãƒ‡ãƒ¼ã‚¿
+	// samples: get_audio() * chæ•°
+	// æˆ»ã‚Šå€¤ï¼šFAWé–‹å§‹ä½ç½®ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã€‚ãªã‘ã‚Œã°-1
 	int findFAW(short *in, int samples) {
 		// search for 72 F8 1F 4E 07 01 00 00
 		static unsigned char faw11[] = {0x72, 0xF8, 0x1F, 0x4E, 0x07, 0x01, 0x00, 0x00};
@@ -72,11 +77,11 @@ public:
 		return -1;
 	}
 
-	// FAWPreview.auf‚ğg‚Á‚ÄFAWƒf[ƒ^1‚Â‚ğ’Šo•ƒfƒR[ƒh‚·‚é
-	// in: FAWŠJnˆÊ’u‚Ìƒ|ƒCƒ“ƒ^BfindFAW‚É“n‚µ‚½in + findFAW‚Ì–ß‚è’l
-	// samples: in‚É‚ ‚éƒf[ƒ^‚ÌshortŠ·Z‚Å‚ÌƒTƒCƒY
-	// out: ƒfƒR[ƒhŒ‹‰Ê‚ğ“ü‚ê‚éƒoƒbƒtƒ@(16bit, 2ch‚Å1024ƒTƒ“ƒvƒ‹)
-	//     i1024sample * 2byte * 2ch = 4096ƒoƒCƒg•K—vj
+	// FAWPreview.aufã‚’ä½¿ã£ã¦FAWãƒ‡ãƒ¼ã‚¿1ã¤ã‚’æŠ½å‡ºï¼†ãƒ‡ã‚³ãƒ¼ãƒ‰ã™ã‚‹
+	// in: FAWé–‹å§‹ä½ç½®ã®ãƒã‚¤ãƒ³ã‚¿ã€‚findFAWã«æ¸¡ã—ãŸin + findFAWã®æˆ»ã‚Šå€¤
+	// samples: inã«ã‚ã‚‹ãƒ‡ãƒ¼ã‚¿ã®shortæ›ç®—ã§ã®ã‚µã‚¤ã‚º
+	// out: ãƒ‡ã‚³ãƒ¼ãƒ‰çµæœã‚’å…¥ã‚Œã‚‹ãƒãƒƒãƒ•ã‚¡(16bit, 2chã§1024ã‚µãƒ³ãƒ—ãƒ«)
+	//     ï¼ˆ1024sample * 2byte * 2ch = 4096ãƒã‚¤ãƒˆå¿…è¦ï¼‰
 	int decodeFAW(const short *in, int samples, short *out){
 		if (load()) {
 			return _ExtractDecode1FAW(in, samples, out, is_half);
@@ -85,14 +90,14 @@ public:
 	}
 };
 
-// FAWƒfƒR[ƒhƒtƒBƒ‹ƒ^
+// FAWãƒ‡ã‚³ãƒ¼ãƒ‰ãƒ•ã‚£ãƒ«ã‚¿
 class FAWDecoder : public NullSource {
 	CFAW _cfaw;
 	Source *_src;
 	WAVEFORMATEX fmt;
 public:
 	FAWDecoder(Source *src) : NullSource(), _src(src){
-		ZeroMemory(&fmt, sizeof(fmt));
+		memset(&fmt, 0, sizeof(fmt));
 		fmt.wFormatTag = WAVE_FORMAT_PCM;		
 		fmt.nChannels = 2;
 		fmt.nSamplesPerSec = 48000;
@@ -121,7 +126,8 @@ public:
 			return 0;
 		}
 
-		// 2ch‚È‚Ì‚Å2‚ÅŠ„‚é
+		// 2chãªã®ã§2ã§å‰²ã‚‹
 		return _cfaw.decodeFAW(buf+j, nsamples-j, buf) / 2;
 	}
 };
+#endif
