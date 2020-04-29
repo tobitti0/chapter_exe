@@ -1,0 +1,27 @@
+#include <winver.h>
+
+VS_VERSION_INFO    VERSIONINFO 
+FILEVERSION        15,04,00
+FILEFLAGSMASK      VS_FFI_FILEFLAGSMASK 
+FILEFLAGS          0x00000000L
+FILEOS             VOS__WINDOWS32
+FILETYPE           VFT_APP
+FILESUBTYPE        VFT2_UNKNOWN
+BEGIN
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0411, 932
+    END
+
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904E4"
+        BEGIN
+            VALUE "FileDescription",  "chapter_exe_mod"
+            VALUE "LegalCopyright",   "Copyright (C) 2011 ru"
+            VALUE "OriginalFilename", "chapter_exe.exe"
+            VALUE "ProductName",      "chapter_exe"
+            VALUE "ProductVersion",   "r15"
+        END 
+    END
+END

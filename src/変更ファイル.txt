@@ -1,0 +1,30 @@
+2012/11/24 Yobi
+変更したファイルは下記２つ、シーンチェンジ検出関連のみ
+chapter_exe.cpp
+mvec.cpp
+
+2013/6/1 sysuzu
+変更：chapter_exe.cpp
+	nomute でなくても seri >= 指定無音数 ならシーンチェンジ検出（無音エンドカード終了地点検出用
+	指定無音数用に引数　-b <int>　を追加
+	abs(buf[j]) > mute判定時にnaudio * チャンネル数を削除
+	
+追加：chapter_exe.rc
+	プロパティでバージョン見れるように追加　ver 15.2 (r15 mod2)
+
+2013/11/28 Yobi
+変更：chapter_exe.cpp
+	シーンチェンジ検索実行フレーム関連の変更
+	無音検索範囲を拡大する引数　-e <int>　を追加
+変更：chapter_exe.rc
+	プロパティのバージョンを変更 ver15.3(r15 mod3)
+
+2014/7/17 Yobi
+変更：chapter_exe.cpp
+	シーンチェンジ判定アルゴリズムの改修
+        無音検出の間引き無効処理（引数指定時：--thin,--serial）
+	シーンチェンジデバッグ用情報を付加した出力（引数指定時：--debug）
+変更：mvec.cpp
+	シーンチェンジ判定アルゴリズムの改修
+変更：chapter_exe.rc
+	プロパティのバージョンを変更 ver15.4(r15 mod4)
