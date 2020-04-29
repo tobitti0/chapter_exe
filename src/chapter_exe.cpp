@@ -141,7 +141,7 @@ int main(int argc, const char* argv[])
 	}
 
 	if (out == NULL) {
-		printf("error: no output file path!");
+		printf("error: no output file path!\n");
 		return -1;
 	}
 
@@ -212,12 +212,12 @@ int main(int argc, const char* argv[])
 
 	FILE *fout;
 	if (fopen_s(&fout, out, "w") != 0) {
-		printf("Error: output file open failed.");
+		printf("Error: output file open failed.\n");
 		video->release();
 		audio->release();
 		return -1;
 	}
-
+	
 	INPUT_INFO &vii = video->get_input_info();
 	INPUT_INFO &aii = audio->get_input_info();
 
@@ -228,14 +228,14 @@ int main(int argc, const char* argv[])
 
 	printf("\tAudio Samples: %d [%dHz]\n", aii.audio_n, aii.audio_format->nSamplesPerSec);
 
-	if (fcc == 0x32424752 || fcc == 0x38344359) {
-		printf("Error: Unsupported color RGB/YC48.");
-	}
-
-	if (fcc != 0x32595559) {
-		printf("warning: only YUY2 is supported. continues...\n");
-		//return -1;
-	}
+//	if (fcc == 0x32424752 || fcc == 0x38344359) {
+//		printf("Error: Unsupported color RGB/YC48.");
+//	}
+//
+//	if (fcc != 0x32595559) {
+//		printf("warning: only YUY2 is supported. continues...\n");
+//		//return -1;
+//	}
 
 	short buf[4800*2]; // 10fps以上
 	int n = vii.n;
