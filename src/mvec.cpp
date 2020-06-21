@@ -689,7 +689,7 @@ int full_search(unsigned char* current_pix,	//現フレームの輝度。8ビッ
 //		フレーム間絶対値差合計関数
 //---------------------------------------------------------------------
 //bbMPEGのソースを流用
-#include <emmintrin.h>
+#include "sse2neon.h"
 
 int dist( unsigned char *p1, unsigned char *p2, int lx, int distlim, int block_height )
 {
