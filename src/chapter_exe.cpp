@@ -221,12 +221,12 @@ int main(int argc, const char* argv[])
 	INPUT_INFO &vii = video->get_input_info();
 	INPUT_INFO &aii = audio->get_input_info();
 
-	printf("Movie data\n");
-	printf("\tVideo Frames: %d [%.02ffps]\n", vii.n, (double)vii.rate / vii.scale);
+	fprintf(stderr, "Movie data\n");
+	fprintf(stderr, "\tVideo Frames: %d [%.02ffps]\n", vii.n, (double)vii.rate / vii.scale);
 	uint32_t fcc = vii.handler;
-	printf("\tVideo Format: %c%c%c%c\n", fcc & 0xFF, fcc >> 8 & 0xFF, fcc >> 16 & 0xFF, fcc >> 24);
+	fprintf(stderr, "\tVideo Format: %c%c%c%c\n", fcc & 0xFF, fcc >> 8 & 0xFF, fcc >> 16 & 0xFF, fcc >> 24);
 
-	printf("\tAudio Samples: %d [%dHz]\n", aii.audio_n, aii.audio_format->nSamplesPerSec);
+	fprintf(stderr, "\tAudio Samples: %d [%dHz]\n", aii.audio_n, aii.audio_format->nSamplesPerSec);
 
 //	if (fcc == 0x32424752 || fcc == 0x38344359) {
 //		printf("Error: Unsupported color RGB/YC48.");
