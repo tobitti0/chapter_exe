@@ -8,6 +8,7 @@
 
 #ifdef _WIN32
 #include <Windows.h>
+#include <algorithm>
 #else
 #include <string.h>
 #include <algorithm>

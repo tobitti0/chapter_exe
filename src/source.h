@@ -5,11 +5,14 @@
 #undef UNICODE
 #ifdef _WIN32
   #include <windows.h>
+  #include <climits>
 #else
   #include <dlfcn.h>
   #include <limits.h>
 
   #define LoadLibrary(x) dlopen(x, RTLD_NOW | RTLD_LOCAL)
+  #define _ftelli64 ftello
+  #define _fseeki64 fseeko
   #define GetProcAddress dlsym
   #define FreeLibrary dlclose
 #endif
@@ -229,11 +232,7 @@ public:
 				}
 			} else if (strncmp(buf, "data", 4) == 0){
 				fseek(_f, 4, SEEK_CUR);
-#ifdef _WIN32
 				_start = _ftelli64(_f);
-#else
-				_start = ftello(_f);
-#endif
 				break;
 			} else {
 				fseek(_f, size, SEEK_CUR);
@@ -255,11 +254,7 @@ public:
 		int64_t start = (int)((double)frame * _ip.audio_format->nSamplesPerSec / _ip.rate * _ip.scale);
 		int64_t end = (int)((double)(frame + 1) * _ip.audio_format->nSamplesPerSec / _ip.rate * _ip.scale);
 
-#ifdef _WIN32
 		_fseeki64(_f, _start + start * _fmt.nBlockAlign, SEEK_SET);
-#else
-		fseeko(_f, _start + start * _fmt.nBlockAlign, SEEK_SET);
-#endif
 
 		return fread(buf, _fmt.nBlockAlign, (size_t)(end - start), _f);
 	}
@@ -372,7 +367,7 @@ public:
     format.biHeight = inf->height;
     format.biWidth = inf->width;
     // 48kHzで12時間を超えるとINT_MAXを越えてしまうが表示にしか使っていないのでOK
-    _ip.audio_n = (int)min((INT64)INT_MAX, inf->num_audio_samples);
+    _ip.audio_n = (int)min((int64_t)INT_MAX, inf->num_audio_samples);
     _ip.audio_format = &audio_format;
     audio_format.nChannels = inf->nchannels;
     audio_format.nSamplesPerSec = inf->audio_samples_per_second;
@@ -398,8 +393,8 @@ public:
       throw err;
     }
     static const int planes[] = {AVS_PLANAR_Y, AVS_PLANAR_U, AVS_PLANAR_V};
-    int pitch = avs_get_pitch_p(f, planes[0]);
-    const unsigned char* data = avs_get_read_ptr_p(f, planes[0]);
+    int pitch = avs_h.func.avs_get_pitch_p(f, planes[0]);
+    const unsigned char* data = avs_h.func.avs_get_read_ptr_p(f, planes[0]);
 
     int w = _ip.format->biWidth & 0xFFFFFFF0;
     int h = _ip.format->biHeight & 0xFFFFFFF0;

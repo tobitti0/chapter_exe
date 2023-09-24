@@ -4,16 +4,19 @@
 #include "source.h"
 #include "faw.h"
 #include <stdint.h>
-
-#ifndef _WIN32
-#define sprintf_s sprintf
-#define _stricmp  strcasecmp
 #include <malloc.h>
+
+#define sprintf_s sprintf
 int fopen_s(FILE **fp,const char *s,const char *m)
 {
 *fp = fopen(s,m);
 return *fp == NULL;
 }
+
+#ifdef _WIN32
+#include <Windows.h>
+#else
+#define _stricmp  strcasecmp
 #define _aligned_malloc(a,b) memalign(b,a)
 #define _aligned_free free
 #endif
@@ -45,6 +48,14 @@ void write_chapter(FILE *f, int nchap, int frame, char *title, INPUT_INFO *iip) 
 	fprintf(f, "CHAPTER%02dNAME=%s\n", nchap, title);
 	fflush(f);
 }
+
+void print_help() {
+	printf("usage:\n");
+	printf("\tchapter_exe.exe -v input_avs -o output_txt\n");
+	printf("params:\n\t-v 入力画像ファイル\n\t-a 入力音声ファイル（省略時は動画と同じファイル）\n\t-m 無音判定閾値（1～2^15)\n\t-s 最低無音フレーム数\n\t-b 無音シーン検索間隔数\n");
+	printf("\t-e 無音前後検索拡張フレーム数\n");
+}
+
 // 解析用の出力
 void write_chapter_debug(FILE *f, int nchap, int frame, char *title, INPUT_INFO *iip) {
 	int64_t t,h,m;
@@ -56,7 +67,7 @@ void write_chapter_debug(FILE *f, int nchap, int frame, char *title, INPUT_INFO 
 	s = (t - h * 36000000000 - m * 600000000) / 10000000.0;
 
 	fprintf(f, "CHAPTER%02d=%02d:%02d:%06.3f from:%d\n", nchap, (int)h, (int)m, s, frame);   // add "from:%d" for debug
-//	fprintf(f, "CHAPTER%02d=%02d:%02d:%06.3f\n", nchap, (int)h, (int)m, s);
+	// fprintf(f, "CHAPTER%02d=%02d:%02d:%06.3f\n", nchap, (int)h, (int)m, s);
 	fprintf(f, "CHAPTER%02dNAME=%s\n", nchap, title);
 	fflush(f);
 }
@@ -64,11 +75,7 @@ void write_chapter_debug(FILE *f, int nchap, int frame, char *title, INPUT_INFO 
 int main(int argc, const char* argv[])
 {
 
-	printf("chapter.auf pre loading program.\n");
-	printf("usage:\n");
-	printf("\tchapter_exe.exe -v input_avs -o output_txt\n");
-	printf("params:\n\t-v 入力画像ファイル\n\t-a 入力音声ファイル（省略時は動画と同じファイル）\n\t-m 無音判定閾値（1〜2^15)\n\t-s 最低無音フレーム数\n\t-b 無音シーン検索間隔数\n");
-	printf("\t-e 無音前後検索拡張フレーム数\n");
+	// printf("chapter.auf pre loading program.\n");
 
 	const char *avsv = NULL;
 	const char *avsa = NULL;
@@ -135,13 +142,19 @@ int main(int argc, const char* argv[])
 		}
 	}
 
+	if (avsv == NULL) {
+		printf("error: no input file path!\n");
+		print_help();
+		return -1;
+	}
 	// 音声入力が無い場合は動画内にあると仮定
 	if (avsa == NULL) {
 		avsa = avsv;
 	}
 
 	if (out == NULL) {
-		printf("error: no output file path!");
+		printf("error: no output file path!\n");
+		print_help();
 		return -1;
 	}
 
@@ -149,7 +162,7 @@ int main(int argc, const char* argv[])
 	printf("\tvideo: %s\n\taudio: %s\n\tout: %s\n", avsv, (strcmp(avsv, avsa) ? avsa : "(within video source)"), out);
 	printf("\tmute: %d seri: %d bmute: %d emute: %d\n", setmute, setseri, breakmute, extendmute);
 
-	printf("Loading plugins.\n");
+	//printf("Loading plugins.\n");
 
 	Source *video = NULL;
 	Source *audio = NULL;
@@ -212,7 +225,7 @@ int main(int argc, const char* argv[])
 
 	FILE *fout;
 	if (fopen_s(&fout, out, "w") != 0) {
-		printf("Error: output file open failed.");
+		printf("Error: output file open failed.\n");
 		video->release();
 		audio->release();
 		return -1;
@@ -221,21 +234,12 @@ int main(int argc, const char* argv[])
 	INPUT_INFO &vii = video->get_input_info();
 	INPUT_INFO &aii = audio->get_input_info();
 
-	printf("Movie data\n");
-	printf("\tVideo Frames: %d [%.02ffps]\n", vii.n, (double)vii.rate / vii.scale);
-	uint32_t fcc = vii.handler;
-	printf("\tVideo Format: %c%c%c%c\n", fcc & 0xFF, fcc >> 8 & 0xFF, fcc >> 16 & 0xFF, fcc >> 24);
+	fprintf(stderr,"Movie data\n");
+	fprintf(stderr,"\tVideo Frames: %d [%.02ffps]\n", vii.n, (double)vii.rate / vii.scale);
+	// uint32_t fcc = vii.handler;
+	// fprintf(stderr,"\tVideo Format: %c%c%c%c\n", fcc & 0xFF, fcc >> 8 & 0xFF, fcc >> 16 & 0xFF, fcc >> 24);
 
-	printf("\tAudio Samples: %d [%dHz]\n", aii.audio_n, aii.audio_format->nSamplesPerSec);
-
-	if (fcc == 0x32424752 || fcc == 0x38344359) {
-		printf("Error: Unsupported color RGB/YC48.");
-	}
-
-	if (fcc != 0x32595559) {
-		printf("warning: only YUY2 is supported. continues...\n");
-		//return -1;
-	}
+	fprintf(stderr,"\tAudio Samples: %d [%dHz]\n", aii.audio_n, aii.audio_format->nSamplesPerSec);
 
 	short buf[4800*2]; // 10fps以上
 	int n = vii.n;
@@ -482,7 +486,7 @@ int proc_scene_change(
 			else{
 				//--- シーンチェンジ上書きになる場合の実行を判別 ---
 				if (flag_sc > 0 && d_max_flagsc[msel] > 0){			// シーンチェンジありで上書きになる場合
-//					printf("overwrite %d,%d,%d -> %d,%d,%d\n", d_max_pos[msel], d_max_mvec[msel], d_max_scrate[msel], x, cmvec, rate_sc);
+					// printf("overwrite %d,%d,%d -> %d,%d,%d\n", d_max_pos[msel], d_max_mvec[msel], d_max_scrate[msel], x, cmvec, rate_sc);
 					if (abs(x - d_max_pos[msel]) <= space_sc2){ 	// 上書き前の位置から間隔が短い場合
 						if (d_max_scrate[msel] >= THRES_RATE1 ||	// 前回地点の画面転換割合が大きい場合無効化
 							rate_sc < THRES_RATE1 ||				// 今回地点の画面転換割合が小さい場合無効化
@@ -497,9 +501,9 @@ int proc_scene_change(
 						}
 					}
 				}
-//if (x > 50108 && x < 50118){
-//printf("(%d %d %d %d %d)\n", x, flag_sc, rate_sc, last_rate, pos_lastchange);
-//}
+				//if (x > 50108 && x < 50118){
+					//printf("(%d %d %d %d %d)\n", x, flag_sc, rate_sc, last_rate, pos_lastchange);
+				//}
 				//--- シーンチェンジ直後の再シーンチェンジ実行を判別 ---
 				// 原則シーンチェンジ検出直後は連続で保持しないよう間隔をあける
 				skip_update = 0;
@@ -564,10 +568,10 @@ int proc_scene_change(
 			last_cmvec  = cmvec;
 			last_cmvec2 = cmvec2;
 			last_rate = rate_sc;
-//if (x>=48889 && x<=48910) printf("[%d:%d,%d,%d,%d]", x,cmvec,rate_sc,d_max_mvec[msel],d_max_flagsc[msel]);
-//					if (x>=9265 && x<=9269){
-//						fprintf(fout, "(%d:%d)",x,cmvec);
-//					}
+			// if (x>=48889 && x<=48910) printf("[%d:%d,%d,%d,%d]", x,cmvec,rate_sc,d_max_mvec[msel],d_max_flagsc[msel]);
+			// if (x>=9265 && x<=9269){
+				// fprintf(fout, "(%d:%d)",x,cmvec);
+			// }
 		}
 
 		// ２箇所目以降でシーンチェンジがなかったら無効化
@@ -761,8 +765,8 @@ int proc_scene_change(
 				char tmp_title[256];
 				sprintf_s(tmp_title, " Rate:%d", d_max_scrate[k]);
 				strcat(title, tmp_title);
-//				sprintf_s(tmp_title, " : [%d %d] [%d %d] [%d %d]"), d_maxn_mvec[k], d_maxn_mvec2[k], d_max_mvec[k], d_max_mvec2[k], d_maxp_mvec[k], d_maxp_mvec2[k]);
-//				strcat(title, tmp_title);
+				// sprintf_s(tmp_title, " : [%d %d] [%d %d] [%d %d]"), d_maxn_mvec[k], d_maxn_mvec2[k], d_max_mvec[k], d_max_mvec2[k], d_maxp_mvec[k], d_maxp_mvec2[k]);
+				// strcat(title, tmp_title);
 				write_chapter_debug(fout, idx, start_fr, title, &vii);
 			}
 		}
