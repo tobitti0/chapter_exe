@@ -1,0 +1,25 @@
+name: build
+
+# 手動実行
+on: workflow_dispatch
+
+jobs:
+  build-windows:
+    run-on: windows-2022
+    steps:
+      - name: checkout@v3
+        uses: actions/checkout@v3
+
+      - name: g++ version
+        run: g++ -v
+
+      - name: Build
+        run: |
+          cd src
+          make
+
+      - name: Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: chapter_exe.exe
+          path: chapter_exe.exe
