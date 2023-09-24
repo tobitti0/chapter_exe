@@ -8,6 +8,10 @@ ifeq ($(OS),Windows_NT)
   PROGRAM := $(PROGRAM).exe
   CFLAGS += -finput-charset=UTF-8 -fexec-charset=CP932 -DSYS_WINDOWS=1 -msse4.1
 else
+  UNAME_MACHINE:=$(shell uname -m)
+  ifeq ($(UNAME_MACHINE),aarch64)
+    CFLAGS += -mfpu=neon -DSYS_ARM64
+  endif
   LDLAGS += -ldl
 endif
 
