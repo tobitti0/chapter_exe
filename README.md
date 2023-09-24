@@ -28,3 +28,12 @@ Linuxに移植されたsogaani氏
 に深く感謝いたします。
 
 [5]:https://github.com/rutice
+
+## メモ
+avs\_internalはx264 projectのavs.cから一部抜粋し微修正したものである。  
+
+ARM向けで使用しているsse2neonは下記のリポジトリのものである。  
+[DLTcollab/ss2neon][6]  
+
+[6]:https://github.com/DLTcollab/sse2neon
+
