@@ -22,4 +22,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: chapter_exe.exe
-          path: chapter_exe.exe
+          path: src/chapter_exe.exe
