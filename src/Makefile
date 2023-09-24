@@ -6,7 +6,7 @@ PROGRAM = chapter_exe
 
 ifeq ($(OS),Windows_NT)
   PROGRAM := $(PROGRAM).exe
-  CFLAGS += -finput-charset=UTF-8 -fexec-charset=CP932 -DSYS_WINDOWS=1 -msse4.1
+  CFLAGS += -static -finput-charset=UTF-8 -fexec-charset=CP932 -DSYS_WINDOWS=1 -msse4.1
 else
   UNAME_MACHINE:=$(shell uname -m)
   ifeq ($(UNAME_MACHINE),aarch64)
