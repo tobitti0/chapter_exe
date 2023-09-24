@@ -1,7 +1,9 @@
 # chapter_exe for AviSynth+ 3.5.x & Linux
 ## 概要
 AviSynth+はVer3.5.0からNative Linuxをサポートした。  
-これは[sogaani氏][1]がLinuxに移植された[chapter_exe][2]をAvisynth+3.5.xで動作するように改造したもの。
+これは[sogaani氏][1]がLinuxに移植された[chapter_exe][2]を  
+Avisynth+3.5.xを使用するようにしたもの。  
+また、WindwosとLinuxの両環境にてビルドおよび使用できる。
 
 [1]:https://github.com/sogaani
 [2]:https://github.com/sogaani/JoinLogoScp/tree/master/chapter_exe
