@@ -18,6 +18,10 @@ jobs:
           cd src
           make
 
+      - name: test run
+        run: src/chapter_exe.exe
+        shell: bash
+
       - name: Artifact
         uses: actions/upload-artifact@v3
         with:
