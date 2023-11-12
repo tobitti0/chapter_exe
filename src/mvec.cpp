@@ -690,7 +690,7 @@ int full_search(unsigned char* current_pix,	//現フレームの輝度。8ビッ
 //		フレーム間絶対値差合計関数
 //---------------------------------------------------------------------
 //bbMPEGのソースを流用
-#ifdef SYS_ARM64
+#ifdef SYS_ARM
 #include "sse2neon.h"
 #else
 #include <emmintrin.h>

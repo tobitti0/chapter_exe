@@ -24,7 +24,7 @@
  * For more information, contact us at licensing@x264.com.
  *****************************************************************************/
 
-#if _WIN32
+#if SYS_WINDOWS
 #include <windows.h>
 #define avs_open() LoadLibraryW( L"avisynth.dll" )
 #define avs_close FreeLibrary
@@ -34,7 +34,15 @@
 #if SYS_MACOSX
 #define avs_open() dlopen( "libavisynth.dylib", RTLD_NOW )
 #else
-#define avs_open() dlopen( "libavisynth.so", RTLD_NOW )
+//#define avs_open() dlopen( "libavisynth.so", RTLD_NOW )
+void* avs_open(){
+    void *handle;
+    handle = dlopen("libavisynth.so",RTLD_NOW);
+    if(!handle){
+      printf("dlopen failed : %s\n",dlerror());
+    }
+    return handle;
+}
 #endif
 #define avs_close dlclose
 #define avs_address dlsym

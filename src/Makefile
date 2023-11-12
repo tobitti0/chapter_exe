@@ -6,14 +6,27 @@ PROGRAM = chapter_exe
 
 ifeq ($(OS),Windows_NT)
   PROGRAM := $(PROGRAM).exe
-  CFLAGS += -static -finput-charset=UTF-8 -fexec-charset=CP932 -DSYS_WINDOWS=1 -msse4.1
-  LDLAGS += -static
+  CFLAGS += -finput-charset=UTF-8 -fexec-charset=CP932 -DSYS_WINDOWS=1 -msse4.1
 else
   UNAME_MACHINE:=$(shell uname -m)
-  ifeq ($(UNAME_MACHINE),aarch64)
-    CFLAGS += -mfpu=neon -DSYS_ARM64
+  ifeq ($(UNAME_MACHINE),aarch32)
+    CFLAGS += -mfpu=neon -DSYS_ARM
+  else ifeq ($(UNAME_MACHINE),aarch64)
+    CFLAGS += -DSYS_ARM
+  else
+    CFLAGS += -msse4.1
+    LDLAGS += -ldl
+
   endif
-  LDLAGS += -ldl
+endif
+
+ifeq ($(STATIC),1)
+  CFLAGS += -static
+  LDLAGS += -Wl,-rpath='$$ORIGIN'
+endif
+
+ifeq ($(DUMP),1)
+  CFLAGS += -g
 endif
 
 .SUFFIXES: .c .o
