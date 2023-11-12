@@ -58,7 +58,7 @@ jobs:
         mkdir avisynth-build
         cd avisynth-build
         cmake ../
-        make VersionGen instal
+        make VersionGen install
         git clone https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works.git
         cd L-SMASH-Works/AviSynth
         meson --default-library static build
