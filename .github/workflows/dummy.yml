@@ -54,6 +54,7 @@ jobs:
         ./configure
         make
         git clone --depth 1 -b v3.7.3 https://github.com/AviSynth/AviSynthPlus.git
+        cd AviSynthPlus
         mkdir avisynth-build
         cd avisynth-build
         cmake ../
