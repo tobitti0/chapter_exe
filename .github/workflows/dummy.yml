@@ -55,7 +55,7 @@ jobs:
         make
         git clone https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works.git
         cd L-SMASH-Works/AviSynth
-        meson build -Dbuildtype=static
+        meson --default-library static build
         cd build
         ninja -v
         ls -la
