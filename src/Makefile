@@ -7,6 +7,11 @@ PROGRAM = chapter_exe
 ifeq ($(OS),Windows_NT)
   PROGRAM := $(PROGRAM).exe
   CFLAGS += -finput-charset=UTF-8 -fexec-charset=CP932 -DSYS_WINDOWS=1 -msse4.1
+  ifeq ($(STATIC),1)
+    CFLAGS += -static
+    LDLAGS += -static
+  endif
+
 else
   UNAME_MACHINE:=$(shell uname -m)
   ifeq ($(UNAME_MACHINE),aarch32)
@@ -16,14 +21,14 @@ else
   else
     CFLAGS += -msse4.1
     LDLAGS += -ldl
+  endif
 
+  ifeq ($(STATIC),1)
+    CFLAGS += -static
+    LDLAGS += -Wl,-rpath='$$ORIGIN'
   endif
 endif
 
-ifeq ($(STATIC),1)
-  CFLAGS += -static
-  LDLAGS += -Wl,-rpath='$$ORIGIN'
-endif
 
 ifeq ($(DUMP),1)
   CFLAGS += -g
