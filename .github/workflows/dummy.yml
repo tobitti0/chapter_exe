@@ -16,7 +16,7 @@ jobs:
       - name: Build
         run: |
           cd src
-          make
+          make STATIC=1
 
       - name: Artifact
         uses: actions/upload-artifact@v3
