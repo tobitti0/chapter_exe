@@ -53,6 +53,11 @@ jobs:
         cd l-smash
         ./configure
         make
+        git clone --depth 1 -b 3.7.3 https://github.com/AviSynth/AviSynthPlus.git
+        mkdir avisynth-build
+        cd avisynth-build
+        cmake ../
+        make VersionGen instal
         git clone https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works.git
         cd L-SMASH-Works/AviSynth
         meson --default-library static build
