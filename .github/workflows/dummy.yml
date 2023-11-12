@@ -42,3 +42,20 @@ jobs:
         with:
           name: chapter_exe
           path: src/chapter_exe
+  build-lib:
+    runs-on: ubuntu-20.04
+    steps:
+     - name: build
+       run: |
+        git clone https://github.com/l-smash/l-smash.git
+        cd l-smash
+        ./configure
+        make
+        make install
+        git clone https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works.git
+        cd L-SMASH-Works/AviSynth
+        meson build -Dbuildtype=static
+        cd build
+        ninja -v
+        ls -la
+        
