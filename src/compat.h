@@ -1,5 +1,6 @@
 #ifndef __COMPAT__
 #define __COMPAT__
+#include <cstdint>
 #ifndef _WIN32
 typedef struct
 {
