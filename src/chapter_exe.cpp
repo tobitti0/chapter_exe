@@ -282,70 +282,80 @@ int main(int argc, const char* argv[])
 	int h = vii.format->biHeight & 0xFFFFFFF0;
 	unsigned char *pix0 = (unsigned char*)_aligned_malloc(w * h, 32);
 	unsigned char *pix1 = (unsigned char*)_aligned_malloc(w * h, 32);
+	try {
+		// start searching
+		for (int i=0; i<n-setseri-1; i++) {
+			// searching foward frame
+			if (seri == 0 && thin_audio_read > 0) {		// 間引きしながら無音確認
+				int naudio = audio->read_audio(i+setseri-1, buf);
 
-	// start searching
-	for (int i=0; i<n-setseri-1; i++) {
-		// searching foward frame
-		if (seri == 0 && thin_audio_read > 0) {		// 間引きしながら無音確認
-			int naudio = audio->read_audio(i+setseri-1, buf);
+				bool skip = false;
+				for (int j=0; j<naudio; ++j) {
+					volume = abs(buf[j]);
+					//if (abs(buf[j]) > mute) {
+					if (volume > mute) {
+						skip = true;
+						break;
+					}
+				}
+				if (skip) {
+					i += setseri;
+				}
+			}
 
-			bool skip = false;
+			bool nomute = false;
+			int naudio = audio->read_audio(i, buf);
+
 			for (int j=0; j<naudio; ++j) {
 				volume = abs(buf[j]);
 				//if (abs(buf[j]) > mute) {
 				if (volume > mute) {
-					skip = true;
+					nomute = true;
 					break;
 				}
 			}
-			if (skip) {
-				i += setseri;
+
+			//
+			if (nomute || i == n-1) {
+				// owata
+				if (seri >= setseri) {
+					int start_fr = i - seri;
+
+					fprintf(stderr,"mute%2d: %d - %dフレーム\n", idx, start_fr, seri);
+
+					//--- 区間内のシーンチェンジを取得 ---
+					proc_scene_change(video, &lastmute_scpos, &lastmute_marker, fout, pix0, pix1, w, h,
+										start_fr, seri, setseri, breakmute, extendmute, debug, idx);
+
+
+					idx++;
+				}
+				seri = 0;
+			} else {
+				seri++;
 			}
 		}
+		fprintf(stderr,"end\n");
+		_aligned_free(pix0);
+		_aligned_free(pix1);
+		// 最終フレーム番号を出力（改造版で追加）
+		fprintf(fout, "# SCPos:%d %d\n", n-1, n-1);
 
-		bool nomute = false;
-		int naudio = audio->read_audio(i, buf);
+		// ソースを解放
+		video->release();
+		audio->release();
 
-		for (int j=0; j<naudio; ++j) {
-			volume = abs(buf[j]);
-			//if (abs(buf[j]) > mute) {
-			if (volume > mute) {
-				nomute = true;
-				break;
-			}
+		return 0;
+	} catch(const char *s) {
+		if (video) {
+			video->release();
 		}
-
-		//
-		if (nomute || i == n-1) {
-			// owata
-			if (seri >= setseri) {
-				int start_fr = i - seri;
-
-				fprintf(stderr,"mute%2d: %d - %dフレーム\n", idx, start_fr, seri);
-
-				//--- 区間内のシーンチェンジを取得 ---
-				proc_scene_change(video, &lastmute_scpos, &lastmute_marker, fout, pix0, pix1, w, h,
-									start_fr, seri, setseri, breakmute, extendmute, debug, idx);
-
-
-				idx++;
-			}
-			seri = 0;
-		} else {
-			seri++;
+		if (audio) {
+			audio->release();
 		}
+		printf("%s\n", s);
+		return -1;
 	}
-	fprintf(stderr,"end\n");
-	_aligned_free(pix0);
-	_aligned_free(pix1);
-	// 最終フレーム番号を出力（改造版で追加）
-	fprintf(fout, "# SCPos:%d %d\n", n-1, n-1);
-
-	// ソースを解放
-	video->release();
-	audio->release();
-
-	return 0;
 }
 
 
