@@ -222,6 +222,27 @@ int main(int argc, const char* argv[])
 			thin_audio_read = 0;
 		}
 	}
+	
+	// ソースがavsで、L-SMASH-Worksで音声読込を行っている場合は間引きをせず読み込む
+	// avsファイルの中身を読み、LSMASHAudioSourceやLWLibavAudioSourceの文字があるかどうかをチェックして雑に判定
+	if (strstr(avsv, ".avs") != NULL && thin_audio_read == 1){
+		bool use_lw_based_audio = false;
+		FILE *avs_fp = NULL;
+		if (fopen_s(&avs_fp, avsv, "r") == 0 && avs_fp != NULL) {
+			char line[1024];
+			while (fgets(line, sizeof(line), avs_fp) != NULL) {
+				if (strstr(line, "LSMASHAudioSource") != NULL ||
+					strstr(line, "LWLibavAudioSource") != NULL) {
+					use_lw_based_audio = true;
+					break;
+				}
+			}
+			fclose(avs_fp);
+		}
+		if (use_lw_based_audio) {
+			thin_audio_read = 0;
+		}
+	}
 
 	FILE *fout;
 	if (fopen_s(&fout, out, "w") != 0) {
