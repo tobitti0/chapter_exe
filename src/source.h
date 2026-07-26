@@ -22,6 +22,13 @@
 #include <string.h>
 #include "input.h"
 
+#ifndef HAVE_AVISYNTH
+#define HAVE_AVISYNTH 1
+#endif
+#ifndef HAVE_DTVINDEX
+#define HAVE_DTVINDEX 1
+#endif
+
 using namespace std;
 
 class Source {
@@ -262,6 +269,7 @@ public:
 
 
 // *.avsソース
+#if HAVE_AVISYNTH
 #include "avs_internal.c"
 
 class AvsSource : public NullSource {
@@ -428,8 +436,11 @@ public:
     return int(end - start);
   }
 };
+#endif
 
+#if HAVE_DTVINDEX
 #include "ffmpeg_source.h"
 #include "dtvindex_source.h"
+#endif
 
 #endif

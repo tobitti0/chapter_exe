@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <malloc.h>
 #include <exception>
+#include <stdexcept>
 #include <vector>
 
 #define sprintf_s sprintf
@@ -46,13 +47,23 @@ Source *open_source(const char *path) {
 	Source *source = NULL;
 	try {
 		if (has_extension(path, ".avs")) {
+#if HAVE_AVISYNTH
 			AvsSource *avs = new AvsSource();
 			source = avs;
 			avs->init(path);
+#else
+			throw std::runtime_error(
+				"AviSynth input is not enabled in this build");
+#endif
 		} else {
+#if HAVE_DTVINDEX
 			DtvIndexSource *dtvindex = new DtvIndexSource();
 			source = dtvindex;
 			dtvindex->init(path);
+#else
+			throw std::runtime_error(
+				"dtvindex input is not enabled in this build");
+#endif
 		}
 		return source;
 	} catch (...) {
@@ -104,6 +115,10 @@ void write_chapter_debug(FILE *f, int nchap, int frame, char *title, INPUT_INFO 
 
 int main(int argc, const char* argv[])
 {
+	printf("chapter_exe: AviSynth=%s, dtvindex=%s\n",
+		HAVE_AVISYNTH ? "enabled" : "disabled",
+		HAVE_DTVINDEX ? "enabled" : "disabled");
+	fflush(stdout);
 
 	// printf("chapter.auf pre loading program.\n");
 
@@ -279,10 +294,12 @@ int main(int argc, const char* argv[])
 	}
 
 	// ソースがdtvindex直接入力の場合は、L-SMASH Worksと同様に間引きをせず読み込む
+#if HAVE_DTVINDEX
 	if (dynamic_cast<DtvIndexSource *>(video) != NULL &&
 		thin_audio_read == 1) {
 		thin_audio_read = 0;
 	}
+#endif
 
 	FILE *fout;
 	if (fopen_s(&fout, out, "w") != 0) {

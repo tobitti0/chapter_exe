@@ -1,8 +1,7 @@
 # chapter_exe for AviSynth+ and FFmpeg
 ## 概要
 AviSynth+はVer3.5.0からNative Linuxをサポートした。  
-これは[sogaani氏][1]がLinuxに移植された[chapter_exe][2]を  
-Avisynth+3.5.xを使用するようにしたもの。  
+これは[sogaani氏][1]がLinuxに移植された[chapter_exe][2]をAvisynth+3.5.xを使用するようにしたもの。  
 また、WindowsとLinuxの両環境にてビルドおよび使用できる。
 
 `future/dtvindex`ブランチでは従来のAVS入力に加えて、FFmpegが対応する動画ファイルを直接入力できる。  動画ファイルには[dtvindex][3]が作成する共通フレーム番号を使用する。
@@ -31,12 +30,42 @@ LogoframeおよびJoinLogoScpまで組み合わせた最終Trimは、放送TS 5�
 この数値はMPEG-2放送TSに対する互換性の目安であり、異なるコーデック、破損状態、タイムスタンプ構成で同じ結果を保証するものではない。
 
 ## 使用方法
-`chapter_exe`と`dtvindex`を同じ親ディレクトリへ配置し、srcで`make`を実行するとビルドできる。  
-AviSynth+およびFFmpegの開発用ライブラリが必要です。
-FFmpeg開発ライブラリで必要なものは次のとおり。  
+
+`src`で`make`を実行すると、利用可能な入力機能を自動検出してビルドする。
+
+```console
+make
+```
+
+AviSynth入力はリポジトリ内のC APIヘッダーを使用してコンパイルされ、
+実行時にAviSynth+を動的に読み込む。dtvindex入力は次の順序で検出する。
+
+1. `DTVINDEX_DIR`で指定したソースツリー
+2. `src/libdtvindex.a`と`src/include/dtvindex/dtvindex.hpp`
+3. `pkg-config`で検出できるインストール済みdtvindex
+4. `chapter_exe`と同じ親ディレクトリにあるdtvindexソースツリー
+
+dtvindex入力に必要なFFmpeg開発ライブラリは次のとおり。
+
 ```
 libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev
 ```
+
+入力機能は明示的に有効化または無効化できる。`yes`を指定した機能の
+依存関係が見つからない場合はビルドエラーになる。
+
+```console
+make WITH_AVISYNTH=yes WITH_DTVINDEX=no
+make WITH_AVISYNTH=no WITH_DTVINDEX=yes
+make DTVINDEX_DIR=/path/to/dtvindex
+```
+
+起動時には、ビルドで有効になった入力機能を表示する。
+
+```text
+chapter_exe: AviSynth=enabled, dtvindex=enabled
+```
+
 実行方法は次のとおり。
 ````
 chapter_exe -v "画像ソースファイル" -a "音声ソースファイル" -o "出力先txt" -m 無音閾値 -s 連続フレーム数
