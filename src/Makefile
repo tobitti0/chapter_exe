@@ -1,39 +1,45 @@
-CC = gcc
-CFLAGS = -w -O3 -I../avisynth -I../extras -ffast-math -Wall -Wshadow -Wempty-body -I. -std=gnu99 -fpermissive -fomit-frame-pointer -s -fno-tree-vectorize
-LDLAGS = -lstdc++ -pthread
+CXX ?= g++
+PKG_CONFIG ?= pkg-config
+FFMPEG_PACKAGES = libavformat libavcodec libavutil libswscale libswresample
+FFMPEG_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(FFMPEG_PACKAGES))
+FFMPEG_LIBS := $(shell $(PKG_CONFIG) --libs $(FFMPEG_PACKAGES))
+CXXFLAGS = -O3 -I../avisynth -I../extras -I. -ffast-math -Wall -Wshadow -Wempty-body -std=gnu++11 -fomit-frame-pointer -fno-tree-vectorize $(FFMPEG_CFLAGS)
+LDLIBS = -pthread $(FFMPEG_LIBS)
 OBJS = chapter_exe.o mvec.o
 PROGRAM = chapter_exe
 
 ifeq ($(OS),Windows_NT)
   PROGRAM := $(PROGRAM).exe
-  CFLAGS += -finput-charset=UTF-8 -fexec-charset=CP932 -DSYS_WINDOWS=1 -msse4.1
+  CXXFLAGS += -finput-charset=UTF-8 -fexec-charset=CP932 -DSYS_WINDOWS=1 -msse4.1
 else
   UNAME_MACHINE := $(shell uname -m)
   UNAME_SYSTEM := $(shell uname -s)
 
   ifeq ($(UNAME_MACHINE),aarch64)
-    CFLAGS += -DSYS_ARM64
+    CXXFLAGS += -DSYS_ARM64
     ifeq ($(UNAME_SYSTEM),Linux)
-      HAVE_NEON := $(shell $(CC) -mfpu=neon -dM -E - </dev/null >/dev/null 2>&1 && echo yes || echo no)
+      HAVE_NEON := $(shell $(CXX) -mfpu=neon -dM -E - </dev/null >/dev/null 2>&1 && echo yes || echo no)
       ifeq ($(HAVE_NEON),yes)
-        CFLAGS += -mfpu=neon
+        CXXFLAGS += -mfpu=neon
       endif
     endif
   endif
 
   ifeq ($(UNAME_SYSTEM),Linux)
-    LDLAGS += -ldl
+    LDLIBS += -ldl
   endif
 endif
 
-.SUFFIXES: .c .o
+.SUFFIXES: .cpp .o
+
+all: $(PROGRAM)
 
 $(PROGRAM): $(OBJS)
-	$(CC) -o $(PROGRAM) $^ $(LDLAGS)
+	$(CXX) -o $(PROGRAM) $^ $(LDLIBS)
 
 .cpp.o:
-	$(CC) $(CFLAGS) -c $<
+	$(CXX) $(CXXFLAGS) -c $<
 
-.PHONY: clean
+.PHONY: all clean
 clean:
 	$(RM) $(PROGRAM) $(OBJS)

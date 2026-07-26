@@ -29,7 +29,7 @@ public:
 	virtual int add_ref() = 0;
 	virtual int release() = 0;
 
-	virtual void init(char *infile) = 0;
+	virtual void init(const char *infile) = 0;
 
 	virtual bool has_video() = 0;
 	virtual bool has_audio() = 0;
@@ -62,7 +62,7 @@ public:
 	}
 
 	// must implement
-	void init(char *infile) { };
+	void init(const char *infile) { };
 	bool read_video_y8(int frame, unsigned char *luma) { return false; };
 	int read_audio(int frame, short *buf) { return 0; };
 };
@@ -96,7 +96,7 @@ public:
 		_in = infile;
 		_plugin = "avsinp.aui";
 
-		int p = _in.find("://");
+		string::size_type p = _in.find("://");
 		if (p != _in.npos) {
 			_plugin = _in.substr(0, p);
 			_in = _in.substr(p+3);
@@ -267,7 +267,7 @@ public:
 class AvsSource : public NullSource {
 protected:
 	avs_hnd_t avs_h;
-	AVS_VideoInfo *inf;
+	const AVS_VideoInfo *inf;
 
   BITMAPINFOHEADER format;
   WAVEFORMATEX audio_format;
@@ -428,5 +428,7 @@ public:
     return int(end - start);
   }
 };
+
+#include "ffmpeg_source.h"
 
 #endif

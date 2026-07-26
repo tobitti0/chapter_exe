@@ -5,6 +5,8 @@
 #include "faw.h"
 #include <stdint.h>
 #include <malloc.h>
+#include <exception>
+#include <vector>
 
 #define sprintf_s sprintf
 int fopen_s(FILE **fp,const char *s,const char *m)
@@ -33,6 +35,34 @@ int proc_scene_change(
 	Source *video,int *lastmute_scpos,int *lastmute_marker,FILE *fout,unsigned char *pix0,unsigned char *pix1,
 	int w,int h,int start_fr,int seri,int setseri,int breakmute,int extendmute,int debug,int idx);
 
+bool has_extension(const char *path, const char *extension) {
+	size_t path_length = strlen(path);
+	size_t extension_length = strlen(extension);
+	return path_length >= extension_length &&
+		_stricmp(path + path_length - extension_length, extension) == 0;
+}
+
+Source *open_source(const char *path) {
+	Source *source = NULL;
+	try {
+		if (has_extension(path, ".avs")) {
+			AvsSource *avs = new AvsSource();
+			source = avs;
+			avs->init(path);
+		} else {
+			FFmpegSource *ffmpeg = new FFmpegSource();
+			source = ffmpeg;
+			ffmpeg->init(path);
+		}
+		return source;
+	} catch (...) {
+		if (source != NULL) {
+			source->release();
+		}
+		throw;
+	}
+}
+
 
 // 通常の出力
 void write_chapter(FILE *f, int nchap, int frame, char *title, INPUT_INFO *iip) {
@@ -51,8 +81,8 @@ void write_chapter(FILE *f, int nchap, int frame, char *title, INPUT_INFO *iip) 
 
 void print_help() {
 	printf("usage:\n");
-	printf("\tchapter_exe.exe -v input_avs -o output_txt\n");
-	printf("params:\n\t-v 入力画像ファイル\n\t-a 入力音声ファイル（省略時は動画と同じファイル）\n\t-m 無音判定閾値（1～2^15)\n\t-s 最低無音フレーム数\n\t-b 無音シーン検索間隔数\n");
+	printf("\tchapter_exe.exe -v input_video_or_avs -o output_txt\n");
+	printf("params:\n\t-v 入力動画またはAVSファイル\n\t-a 入力音声ファイル（省略時は動画と同じファイル）\n\t-m 無音判定閾値（1～2^15)\n\t-s 最低無音フレーム数\n\t-b 無音シーン検索間隔数\n");
 	printf("\t-e 無音前後検索拡張フレーム数\n");
 }
 
@@ -167,8 +197,7 @@ int main(int argc, const char* argv[])
 	Source *video = NULL;
 	Source *audio = NULL;
 	try {
-		AvsSource *srcv = new AvsSource();
-		srcv->init(avsv);
+		Source *srcv = open_source(avsv);
 		if (srcv->has_video() == false) {
 			srcv->release();
 			throw "Error: No Video Found!";
@@ -182,7 +211,7 @@ int main(int argc, const char* argv[])
 
 		// 音声が別ファイルの時
 		if (audio == NULL) {
-			if (strlen(avsa) > 4 && _stricmp(".wav", avsa + strlen(avsa) - 4) == 0) {
+			if (has_extension(avsa, ".wav")) {
 				// wav
 				WavSource *wav = new WavSource();
 				wav->init(avsa);
@@ -193,9 +222,8 @@ int main(int argc, const char* argv[])
 					wav->release();
 				}
 			} else {
-				// aui
-				AvsSource *aud = new AvsSource();
-				aud->init(avsa);
+				// AVSまたはFFmpeg対応音声
+				Source *aud = open_source(avsa);
 				if (aud->has_audio()) {
 					audio = aud;
 					audio->set_rate(video->get_input_info().rate, video->get_input_info().scale);
@@ -208,6 +236,12 @@ int main(int argc, const char* argv[])
 		if (audio == NULL) {
 			throw "Error: No Audio!";
 		}
+	} catch(const std::exception &e) {
+		if (video) {
+			video->release();
+		}
+		printf("%s\n", e.what());
+		return -1;
 	} catch(const char *s) {
 		if (video) {
 			video->release();
@@ -262,50 +296,64 @@ int main(int argc, const char* argv[])
 
 	fprintf(stderr,"\tAudio Samples: %d [%dHz]\n", aii.audio_n, aii.audio_format->nSamplesPerSec);
 
-	short buf[4800*2]; // 10fps以上
+	int64_t max_audio_per_frame =
+		((int64_t)aii.audio_format->nSamplesPerSec * vii.scale + vii.rate - 1) /
+		vii.rate;
+	size_t audio_buffer_size = (size_t)max_audio_per_frame *
+		std::max<int>(1, aii.audio_format->nChannels);
+	// FAWデコード先（16bit、2ch、1024サンプル）にも十分なサイズを確保
+	audio_buffer_size = std::max<size_t>(audio_buffer_size, 4800 * 2);
+	std::vector<short> audio_buffer(audio_buffer_size);
+	short *buf = audio_buffer.data();
 	int n = vii.n;
+	unsigned char *pix0 = NULL;
+	unsigned char *pix1 = NULL;
 
-	// FAW check
-	do {
-		CFAW cfaw;
-		int faws = 0;
-
-		for (int i=0; i<min(90, n); i++) {
-			int naudio = audio->read_audio(i, buf);
-			int j = cfaw.findFAW(buf, naudio);
-			if (j != -1) {
-				cfaw.decodeFAW(buf+j, naudio-j, buf); // test decode
-				faws++;
-			}
-		}
-		if (faws > 5) {
-			if (cfaw.isLoadFailed()) {
-				printf("  Error: FAW detected, but no FAWPreview.auf.\n");
-			} else {
-				printf("  FAW detected.\n");
-				audio = new FAWDecoder(audio);
-			}
-		}
-	} while(0);
-
-	if (thin_audio_read <= 0){
-		printf("read audio : serial\n");
-	}
-	printf("--------\nStart searching...\n");
-
-	short mute = setmute;
-	int seri = 0;
-	int idx = 1;
-	int volume;
-	int lastmute_scpos = -1;			// -eオプションの検索オーバーラップを考慮して前回位置保持
-	int lastmute_marker = -1;			// マーク表示用の起点位置保持
-	int w = vii.format->biWidth & 0xFFFFFFF0;
-	int h = vii.format->biHeight & 0xFFFFFFF0;
-	unsigned char *pix0 = (unsigned char*)_aligned_malloc(w * h, 32);
-	unsigned char *pix1 = (unsigned char*)_aligned_malloc(w * h, 32);
 	try {
-		// start searching
-		for (int i=0; i<n-setseri-1; i++) {
+		// FAW check
+		do {
+			CFAW cfaw;
+			int faws = 0;
+
+			for (int i=0; i<min(90, n); i++) {
+				int naudio = audio->read_audio(i, buf);
+				int j = cfaw.findFAW(buf, naudio);
+				if (j != -1) {
+					cfaw.decodeFAW(buf+j, naudio-j, buf); // test decode
+					faws++;
+				}
+			}
+			if (faws > 5) {
+				if (cfaw.isLoadFailed()) {
+					printf("  Error: FAW detected, but no FAWPreview.auf.\n");
+				} else {
+					printf("  FAW detected.\n");
+					audio = new FAWDecoder(audio);
+				}
+			}
+		} while(0);
+
+		if (thin_audio_read <= 0){
+			printf("read audio : serial\n");
+		}
+		printf("--------\nStart searching...\n");
+
+		short mute = setmute;
+		int seri = 0;
+		int idx = 1;
+		int volume;
+		int lastmute_scpos = -1;			// -eオプションの検索オーバーラップを考慮して前回位置保持
+		int lastmute_marker = -1;			// マーク表示用の起点位置保持
+		int w = vii.format->biWidth & 0xFFFFFFF0;
+		int h = vii.format->biHeight & 0xFFFFFFF0;
+		pix0 = (unsigned char*)_aligned_malloc(w * h, 32);
+		pix1 = (unsigned char*)_aligned_malloc(w * h, 32);
+		if (pix0 == NULL || pix1 == NULL) {
+			throw std::runtime_error("Error: image buffer allocation failed");
+		}
+
+			// start searching
+			for (int i=0; i<n-setseri-1; i++) {
 			// searching foward frame
 			if (seri == 0 && thin_audio_read > 0) {		// 間引きしながら無音確認
 				int naudio = audio->read_audio(i+setseri-1, buf);
@@ -357,18 +405,49 @@ int main(int argc, const char* argv[])
 			}
 		}
 		fprintf(stderr,"end\n");
-		_aligned_free(pix0);
-		_aligned_free(pix1);
-		// 最終フレーム番号を出力（改造版で追加）
-		fprintf(fout, "# SCPos:%d %d\n", n-1, n-1);
+			_aligned_free(pix0);
+			_aligned_free(pix1);
+			pix0 = NULL;
+			pix1 = NULL;
+			// 最終フレーム番号を出力（改造版で追加）
+			fprintf(fout, "# SCPos:%d %d\n", n-1, n-1);
+			fclose(fout);
+			fout = NULL;
 
 		// ソースを解放
 		video->release();
 		audio->release();
 
-		return 0;
-	} catch(const char *s) {
-		if (video) {
+			return 0;
+		} catch(const std::exception &e) {
+			if (pix0) {
+				_aligned_free(pix0);
+			}
+			if (pix1) {
+				_aligned_free(pix1);
+			}
+			if (fout) {
+				fclose(fout);
+			}
+			if (video) {
+				video->release();
+		}
+		if (audio) {
+			audio->release();
+		}
+			printf("%s\n", e.what());
+			return -1;
+		} catch(const char *s) {
+			if (pix0) {
+				_aligned_free(pix0);
+			}
+			if (pix1) {
+				_aligned_free(pix1);
+			}
+			if (fout) {
+				fclose(fout);
+			}
+			if (video) {
 			video->release();
 		}
 		if (audio) {
