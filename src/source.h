@@ -22,6 +22,13 @@
 #include <string.h>
 #include "input.h"
 
+#ifndef HAVE_AVISYNTH
+#define HAVE_AVISYNTH 1
+#endif
+#ifndef HAVE_DTVINDEX
+#define HAVE_DTVINDEX 1
+#endif
+
 using namespace std;
 
 class Source {
@@ -29,7 +36,7 @@ public:
 	virtual int add_ref() = 0;
 	virtual int release() = 0;
 
-	virtual void init(char *infile) = 0;
+	virtual void init(const char *infile) = 0;
 
 	virtual bool has_video() = 0;
 	virtual bool has_audio() = 0;
@@ -62,7 +69,7 @@ public:
 	}
 
 	// must implement
-	void init(char *infile) { };
+	void init(const char *infile) { };
 	bool read_video_y8(int frame, unsigned char *luma) { return false; };
 	int read_audio(int frame, short *buf) { return 0; };
 };
@@ -96,7 +103,7 @@ public:
 		_in = infile;
 		_plugin = "avsinp.aui";
 
-		int p = _in.find("://");
+		string::size_type p = _in.find("://");
 		if (p != _in.npos) {
 			_plugin = _in.substr(0, p);
 			_in = _in.substr(p+3);
@@ -262,12 +269,13 @@ public:
 
 
 // *.avsソース
+#if HAVE_AVISYNTH
 #include "avs_internal.c"
 
 class AvsSource : public NullSource {
 protected:
 	avs_hnd_t avs_h;
-	AVS_VideoInfo *inf;
+	const AVS_VideoInfo *inf;
 
   BITMAPINFOHEADER format;
   WAVEFORMATEX audio_format;
@@ -428,5 +436,11 @@ public:
     return int(end - start);
   }
 };
+#endif
+
+#if HAVE_DTVINDEX
+#include "ffmpeg_source.h"
+#include "dtvindex_source.h"
+#endif
 
 #endif

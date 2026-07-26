@@ -60,7 +60,7 @@
 
 #define LOAD_AVS_FUNC(name, continue_on_fail)\
 {\
-    h->func.name = (void*)avs_address( h->library, #name );\
+    h->func.name = (name##_func)avs_address( h->library, #name );\
     if( !continue_on_fail && !h->func.name )\
         goto fail;\
 }
@@ -68,7 +68,7 @@
 #define LOAD_AVS_FUNC_ALIAS(name, alias, continue_on_fail)\
 {\
     if( !h->func.name )\
-        h->func.name = (void*)avs_address( h->library, alias );\
+        h->func.name = (name##_func)avs_address( h->library, alias );\
     if( !continue_on_fail && !h->func.name )\
         goto fail;\
 }
