@@ -5,15 +5,21 @@ AviSynth+はVer3.5.0からNative Linuxをサポートした。
 Avisynth+3.5.xを使用するようにしたもの。  
 また、WindwosとLinuxの両環境にてビルドおよび使用できる。
 
-`future/ffmpeg`ブランチでは従来のAVS入力に加えて、FFmpegが対応する
-動画ファイルを直接入力できる。
+`future/dtvindex`ブランチでは従来のAVS入力に加えて、FFmpegが対応する
+動画ファイルを直接入力できる。動画ファイルには兄弟プロジェクトの
+`dtvindex`が作成する共通フレーム番号を使用する。
 
 従来AviSynth+を使う利点は、デコード、フィルタ、フレーム単位の
 ランダムアクセスをフレームサーバーへ任せられることにあった。
 FFmpeg直接入力ではこれらに加え、映像・音声PTSの同期、固定フレームレート化、
 破損パケット、後方アクセスを入力側で扱う必要がある。本ブランチの
-`FFmpegSource`は、FFmpegによるデコード、16bit PCM変換、PTSに基づく
-音声同期、局所フレームキャッシュを実装している。
+映像は`dtvindex`の永続インデックスとフレーム読み込み API、音声は
+`FFmpegSource`の16bit PCM変換とPTS同期を使用する。既存の無音検索および
+シーンチェンジ検出処理は変更していない。
+
+dtvindex直接入力では、L-SMASH Works入力と同様に内部の
+`thin_audio_read`を既定で`0`にし、音声を連続して読み込む。`--thin`または
+`--serial`を明示した場合は、その指定を優先する。
 
 [1]:https://github.com/sogaani
 [2]:https://github.com/sogaani/JoinLogoScp/tree/master/chapter_exe
@@ -22,7 +28,8 @@ FFmpeg直接入力ではこれらに加え、映像・音声PTSの同期、固�
 無音検索＋シーンチェンジ(SC)検索を行い、無音・SC位置の情報を出力する。
 
 ## 使用方法
-srcでmakeしてください。  
+`chapter_exe`と`dtvindex`を同じ親ディレクトリへ配置し、srcで
+makeしてください。
 AviSynth+およびFFmpegの開発用ライブラリが必要です。
 実行方法は次のとおりです。
 ````
@@ -30,6 +37,8 @@ chapter_exe -v "画像ソースファイル" -a "音声ソースファイル" -o
 ````
 `-v`には従来の`.avs`ファイル、またはTS、MP4、MKVなどの動画ファイルを
 指定できる。`.avs`は従来どおりAvisynth+で、それ以外はFFmpegで読み込む。
+動画ファイルの初回読み込み時には同じ場所へ`.dtvi`を作成し、2回目以降は
+元ファイルとの整合性を検証して再利用する。
 
 例:
 ````

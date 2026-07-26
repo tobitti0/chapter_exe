@@ -3,7 +3,9 @@ PKG_CONFIG ?= pkg-config
 FFMPEG_PACKAGES = libavformat libavcodec libavutil libswscale libswresample
 FFMPEG_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(FFMPEG_PACKAGES))
 FFMPEG_LIBS := $(shell $(PKG_CONFIG) --libs $(FFMPEG_PACKAGES))
-CXXFLAGS = -O3 -I../avisynth -I../extras -I. -ffast-math -Wall -Wshadow -Wempty-body -std=gnu++11 -fomit-frame-pointer -fno-tree-vectorize $(FFMPEG_CFLAGS)
+DTVINDEX_DIR ?= ../../dtvindex
+DTVINDEX_LIBRARY = $(DTVINDEX_DIR)/build/libdtvindex.a
+CXXFLAGS = -O3 -I../avisynth -I../extras -I. -I$(DTVINDEX_DIR)/include -ffast-math -Wall -Wshadow -Wempty-body -std=gnu++11 -fomit-frame-pointer -fno-tree-vectorize $(FFMPEG_CFLAGS)
 LDLIBS = -pthread $(FFMPEG_LIBS)
 OBJS = chapter_exe.o mvec.o
 PROGRAM = chapter_exe
@@ -34,8 +36,14 @@ endif
 
 all: $(PROGRAM)
 
-$(PROGRAM): $(OBJS)
-	$(CXX) -o $(PROGRAM) $^ $(LDLIBS)
+$(PROGRAM): $(OBJS) dtvindex
+	$(CXX) -o $(PROGRAM) $(OBJS) $(DTVINDEX_LIBRARY) $(LDLIBS)
+
+.PHONY: dtvindex
+dtvindex:
+	$(MAKE) -C $(DTVINDEX_DIR) build/libdtvindex.a
+
+chapter_exe.o: dtvindex_source.h ffmpeg_source.h source.h
 
 .cpp.o:
 	$(CXX) $(CXXFLAGS) -c $<

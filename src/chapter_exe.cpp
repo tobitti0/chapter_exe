@@ -50,9 +50,9 @@ Source *open_source(const char *path) {
 			source = avs;
 			avs->init(path);
 		} else {
-			FFmpegSource *ffmpeg = new FFmpegSource();
-			source = ffmpeg;
-			ffmpeg->init(path);
+			DtvIndexSource *dtvindex = new DtvIndexSource();
+			source = dtvindex;
+			dtvindex->init(path);
 		}
 		return source;
 	} catch (...) {
@@ -276,6 +276,12 @@ int main(int argc, const char* argv[])
 		if (use_lw_based_audio) {
 			thin_audio_read = 0;
 		}
+	}
+
+	// ソースがdtvindex直接入力の場合は、L-SMASH Worksと同様に間引きをせず読み込む
+	if (dynamic_cast<DtvIndexSource *>(video) != NULL &&
+		thin_audio_read == 1) {
+		thin_audio_read = 0;
 	}
 
 	FILE *fout;

@@ -1,3 +1,5 @@
 .DS_Store
 sample/
 Sample/
+*.dtvi
+*.dtvi.tmp
