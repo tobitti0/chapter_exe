@@ -1,5 +1,7 @@
 CXX ?= g++
+AR ?= ar
 PKG_CONFIG ?= pkg-config
+PKG_CONFIG_LIBS ?= --libs
 
 PROGRAM := chapter_exe
 OBJS := chapter_exe.o mvec.o mvec_simd.o
@@ -26,6 +28,7 @@ endif
 CPPFLAGS := -I../extras -I.
 CXXFLAGS := -O3 -ffast-math -Wall -Wshadow -Wempty-body \
 	-std=gnu++11 -fomit-frame-pointer -fno-tree-vectorize
+LDFLAGS :=
 LDLIBS := -pthread
 DTVINDEX_DEPS :=
 
@@ -57,9 +60,13 @@ else
   CPPFLAGS += -DHAVE_AVISYNTH=0
 endif
 
-PKG_CONFIG_FOUND := $(strip $(shell \
-	command -v "$(PKG_CONFIG)" >/dev/null 2>&1 \
+ifeq ($(WITH_DTVINDEX),no)
+  PKG_CONFIG_FOUND := no
+else
+  PKG_CONFIG_FOUND := $(strip $(shell \
+	$(PKG_CONFIG) --version >/dev/null 2>&1 \
 	&& echo yes || echo no))
+endif
 DTVINDEX_PKG_FOUND := $(strip $(if $(filter yes,$(PKG_CONFIG_FOUND)),\
 	$(shell $(PKG_CONFIG) --exists dtvindex libswresample \
 		&& echo yes || echo no),no))
@@ -116,19 +123,19 @@ ifeq ($(ENABLE_DTVINDEX),yes)
 
   ifeq ($(DTVINDEX_MODE),pkg-config)
     CPPFLAGS += $(shell $(PKG_CONFIG) --cflags dtvindex libswresample)
-    LDLIBS += $(shell $(PKG_CONFIG) --libs dtvindex libswresample)
+    LDLIBS += $(shell $(PKG_CONFIG) $(PKG_CONFIG_LIBS) dtvindex libswresample)
   else ifeq ($(DTVINDEX_MODE),local)
     CPPFLAGS += -I$(LOCAL_DTVINDEX_INCLUDE) \
 		$(shell $(PKG_CONFIG) --cflags $(FFMPEG_PACKAGES))
     LDLIBS += $(LOCAL_DTVINDEX_LIBRARY) \
-		$(shell $(PKG_CONFIG) --libs $(FFMPEG_PACKAGES))
+		$(shell $(PKG_CONFIG) $(PKG_CONFIG_LIBS) $(FFMPEG_PACKAGES))
     DTVINDEX_DEPS += $(LOCAL_DTVINDEX_LIBRARY)
   else ifeq ($(DTVINDEX_MODE),source)
     DTVINDEX_LIBRARY := $(DTVINDEX_SOURCE_DIR)/build/libdtvindex.a
     CPPFLAGS += -I$(DTVINDEX_SOURCE_DIR)/include \
 		$(shell $(PKG_CONFIG) --cflags $(FFMPEG_PACKAGES))
     LDLIBS += $(DTVINDEX_LIBRARY) \
-		$(shell $(PKG_CONFIG) --libs $(FFMPEG_PACKAGES))
+		$(shell $(PKG_CONFIG) $(PKG_CONFIG_LIBS) $(FFMPEG_PACKAGES))
     DTVINDEX_DEPS += $(DTVINDEX_LIBRARY)
   endif
 else
@@ -144,7 +151,8 @@ endif
 ifeq ($(OS),Windows_NT)
   PROGRAM := $(PROGRAM).exe
   CXXFLAGS += -finput-charset=UTF-8 -fexec-charset=CP932 \
-	-DSYS_WINDOWS=1 -msse4.1
+	-DSYS_WINDOWS=1 -msse2
+  LDFLAGS += -static -static-libgcc -static-libstdc++
 else
   UNAME_SYSTEM := $(shell uname -s)
 
@@ -167,7 +175,12 @@ $(PROGRAM): $(OBJS) $(DTVINDEX_DEPS)
 
 ifeq ($(DTVINDEX_MODE),source)
 $(DTVINDEX_LIBRARY):
-	$(MAKE) -C "$(DTVINDEX_SOURCE_DIR)" build/libdtvindex.a
+	$(MAKE) -C "$(DTVINDEX_SOURCE_DIR)" build/libdtvindex.a \
+		CXX="$(CXX)" \
+		AR="$(AR)" \
+		OS="$(OS)" \
+		PKG_CONFIG="$(PKG_CONFIG)" \
+		PKG_CONFIG_LIBS="$(PKG_CONFIG_LIBS)"
 endif
 
 chapter_exe.o: source.h mvec_simd.h

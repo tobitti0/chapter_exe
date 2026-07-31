@@ -6,6 +6,7 @@
 #ifdef _WIN32
   #include <windows.h>
   #include <climits>
+  typedef HMODULE library_handle_t;
 #else
   #include <dlfcn.h>
   #include <limits.h>
@@ -15,6 +16,7 @@
   #define _fseeki64 fseeko
   #define GetProcAddress dlsym
   #define FreeLibrary dlclose
+  typedef void *library_handle_t;
 #endif
 #include <string>
 #include <algorithm>
@@ -85,7 +87,7 @@ class AuiSource : public NullSource {
 protected:
 	string _in, _plugin;
 
-	void* _dll;
+	library_handle_t _dll;
 
 	INPUT_PLUGIN_TABLE *_ipt;
 	INPUT_HANDLE _ih;
@@ -109,7 +111,7 @@ public:
 			_in = _in.substr(p+3);
 		}
 
-		printf(" -%s\n", _plugin.c_str());
+		fprintf(stderr, " -%s\n", _plugin.c_str());
 
 		_dll = LoadLibrary(_plugin.c_str());
 		if (_dll == NULL) {
@@ -203,7 +205,7 @@ public:
 	}
 
 	void init(const char *infile) {
-		printf(" -WavSource\n");
+		fprintf(stderr, " -WavSource\n");
 		_f = fopen(infile, "rb");
 		if (_f == NULL) {
 			throw "   wav open failed.";
@@ -225,7 +227,9 @@ public:
 			}
 
 			int size = 0;
-			fread(&size, 4, 1, _f);
+			if (fread(&size, 4, 1, _f) != 1) {
+				throw "   illegal WAVE file.";
+			}
 			if (strncmp(buf, "fmt ", 4) == 0) {
 				if (fread(&_fmt, min(size, (int)sizeof(_fmt)), 1, _f) != 1) {
 					throw "   illegal WAVE file.";
@@ -292,9 +296,8 @@ public:
         internal_avs_close_library(&avs_h);
 	}
 
-  virtual void init(const char *infile) {
+	virtual void init(const char *infile) {
 		int interlaced = 0;
-    int tff = 0;
 		if(internal_avs_load_library(&avs_h) < 0) {
         throw "error: failed to load avisynth.dll";
     }
@@ -339,7 +342,6 @@ public:
         }
         res = internal_avs_update_clip(&avs_h, &inf, tmp, res);
         interlaced = 1;
-        tff = avs_is_tff(inf);
     }
 
     if( avs_is_planar(inf) == false )

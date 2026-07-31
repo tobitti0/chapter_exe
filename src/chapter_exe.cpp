@@ -3,6 +3,7 @@
 
 #include "source.h"
 #include "faw.h"
+#include "mvec_simd.h"
 #include <stdint.h>
 #include <malloc.h>
 #include <exception>
@@ -10,14 +11,14 @@
 #include <vector>
 
 #define sprintf_s sprintf
-int fopen_s(FILE **fp,const char *s,const char *m)
+static int open_file(FILE **fp,const char *s,const char *m)
 {
 *fp = fopen(s,m);
 return *fp == NULL;
 }
 
 #ifdef _WIN32
-#include <Windows.h>
+#include <windows.h>
 #else
 #define _stricmp  strcasecmp
 #define _aligned_malloc(a,b) memalign(b,a)
@@ -90,11 +91,18 @@ void write_chapter(FILE *f, int nchap, int frame, char *title, INPUT_INFO *iip) 
 	fflush(f);
 }
 
-void print_help() {
-	printf("usage:\n");
-	printf("\tchapter_exe.exe -v input_video_or_avs -o output_txt\n");
-	printf("params:\n\t-v 入力動画またはAVSファイル\n\t-a 入力音声ファイル（省略時は動画と同じファイル）\n\t-m 無音判定閾値（1～2^15)\n\t-s 最低無音フレーム数\n\t-b 無音シーン検索間隔数\n");
-	printf("\t-e 無音前後検索拡張フレーム数\n");
+void print_help(FILE *stream) {
+	fprintf(stream, "usage:\n");
+	fprintf(stream,
+		"\tchapter_exe.exe -v input_video_or_avs -o output_txt\n");
+	fprintf(stream,
+		"params:\n"
+		"\t-v 入力動画またはAVSファイル\n"
+		"\t-a 入力音声ファイル（省略時は動画と同じファイル）\n"
+		"\t-m 無音判定閾値（1～2^15)\n"
+		"\t-s 最低無音フレーム数\n"
+		"\t-b 無音シーン検索間隔数\n");
+	fprintf(stream, "\t-e 無音前後検索拡張フレーム数\n");
 }
 
 // 解析用の出力
@@ -115,10 +123,14 @@ void write_chapter_debug(FILE *f, int nchap, int frame, char *title, INPUT_INFO 
 
 int main(int argc, const char* argv[])
 {
-	printf("chapter_exe: AviSynth=%s, dtvindex=%s\n",
+	fprintf(stderr,
+		"chapter_exe\n"
+		"  Input       : AviSynth=%s, dtvindex=%s\n"
+		"  Motion SIMD : %s\n\n",
 		HAVE_AVISYNTH ? "enabled" : "disabled",
-		HAVE_DTVINDEX ? "enabled" : "disabled");
-	fflush(stdout);
+		HAVE_DTVINDEX ? "enabled" : "disabled",
+		mvec_simd::backend_name());
+	fflush(stderr);
 
 	// printf("chapter.auf pre loading program.\n");
 
@@ -179,17 +191,17 @@ int main(int argc, const char* argv[])
 				}
 				break;
 			default:
-				printf("error: unknown param: %s\n", s);
+				fprintf(stderr, "error: unknown param: %s\n", s);
 				break;
 			}
 		} else {
-			printf("error: unknown param: %s\n", s);
+			fprintf(stderr, "error: unknown param: %s\n", s);
 		}
 	}
 
 	if (avsv == NULL) {
-		printf("error: no input file path!\n");
-		print_help();
+		fprintf(stderr, "error: no input file path!\n");
+		print_help(stderr);
 		return -1;
 	}
 	// 音声入力が無い場合は動画内にあると仮定
@@ -198,14 +210,23 @@ int main(int argc, const char* argv[])
 	}
 
 	if (out == NULL) {
-		printf("error: no output file path!\n");
-		print_help();
+		fprintf(stderr, "error: no output file path!\n");
+		print_help(stderr);
 		return -1;
 	}
 
-	printf("Setting\n");
-	printf("\tvideo: %s\n\taudio: %s\n\tout: %s\n", avsv, (strcmp(avsv, avsa) ? avsa : "(within video source)"), out);
-	printf("\tmute: %d seri: %d bmute: %d emute: %d\n", setmute, setseri, breakmute, extendmute);
+	fprintf(stderr, "Setting\n");
+	fprintf(stderr,
+		"\tvideo: %s\n\taudio: %s\n\tout: %s\n",
+		avsv,
+		(strcmp(avsv, avsa) ? avsa : "(within video source)"),
+		out);
+	fprintf(stderr,
+		"\tmute: %d seri: %d bmute: %d emute: %d\n",
+		setmute,
+		setseri,
+		breakmute,
+		extendmute);
 
 	//printf("Loading plugins.\n");
 
@@ -255,13 +276,13 @@ int main(int argc, const char* argv[])
 		if (video) {
 			video->release();
 		}
-		printf("%s\n", e.what());
+		fprintf(stderr, "%s\n", e.what());
 		return -1;
 	} catch(const char *s) {
 		if (video) {
 			video->release();
 		}
-		printf("%s\n", s);
+		fprintf(stderr, "%s\n", s);
 		return -1;
 	}
 
@@ -277,7 +298,7 @@ int main(int argc, const char* argv[])
 	if (strstr(avsv, ".avs") != NULL && thin_audio_read == 1){
 		bool use_lw_based_audio = false;
 		FILE *avs_fp = NULL;
-		if (fopen_s(&avs_fp, avsv, "r") == 0 && avs_fp != NULL) {
+		if (open_file(&avs_fp, avsv, "rb") == 0 && avs_fp != NULL) {
 			char line[1024];
 			while (fgets(line, sizeof(line), avs_fp) != NULL) {
 				if (strstr(line, "LSMASHAudioSource") != NULL ||
@@ -293,7 +314,7 @@ int main(int argc, const char* argv[])
 		}
 	}
 
-	// ソースがdtvindex直接入力の場合は、L-SMASH Worksと同様に間引きをせず読み込む
+	// dtvindex経由の動画ファイル入力では、L-SMASH Worksと同様に間引きをせず読み込む
 #if HAVE_DTVINDEX
 	if (dynamic_cast<DtvIndexSource *>(video) != NULL &&
 		thin_audio_read == 1) {
@@ -302,8 +323,8 @@ int main(int argc, const char* argv[])
 #endif
 
 	FILE *fout;
-	if (fopen_s(&fout, out, "w") != 0) {
-		printf("Error: output file open failed.\n");
+	if (open_file(&fout, out, "wb") != 0) {
+		fprintf(stderr, "Error: output file open failed.\n");
 		video->release();
 		audio->release();
 		return -1;
@@ -317,7 +338,10 @@ int main(int argc, const char* argv[])
 	// uint32_t fcc = vii.handler;
 	// fprintf(stderr,"\tVideo Format: %c%c%c%c\n", fcc & 0xFF, fcc >> 8 & 0xFF, fcc >> 16 & 0xFF, fcc >> 24);
 
-	fprintf(stderr,"\tAudio Samples: %d [%dHz]\n", aii.audio_n, aii.audio_format->nSamplesPerSec);
+	fprintf(stderr,
+		"\tAudio Samples: %d [%luHz]\n",
+		aii.audio_n,
+		(unsigned long)aii.audio_format->nSamplesPerSec);
 
 	int64_t max_audio_per_frame =
 		((int64_t)aii.audio_format->nSamplesPerSec * vii.scale + vii.rate - 1) /
@@ -348,18 +372,19 @@ int main(int argc, const char* argv[])
 			}
 			if (faws > 5) {
 				if (cfaw.isLoadFailed()) {
-					printf("  Error: FAW detected, but no FAWPreview.auf.\n");
+					fprintf(stderr,
+						"  Error: FAW detected, but no FAWPreview.auf.\n");
 				} else {
-					printf("  FAW detected.\n");
+					fprintf(stderr, "  FAW detected.\n");
 					audio = new FAWDecoder(audio);
 				}
 			}
 		} while(0);
 
 		if (thin_audio_read <= 0){
-			printf("read audio : serial\n");
+			fprintf(stderr, "read audio : serial\n");
 		}
-		printf("--------\nStart searching...\n");
+		fprintf(stderr, "--------\nStart searching...\n");
 
 		short mute = setmute;
 		int seri = 0;
@@ -458,7 +483,7 @@ int main(int argc, const char* argv[])
 		if (audio) {
 			audio->release();
 		}
-			printf("%s\n", e.what());
+			fprintf(stderr, "%s\n", e.what());
 			return -1;
 		} catch(const char *s) {
 			if (pix0) {
@@ -476,7 +501,7 @@ int main(int argc, const char* argv[])
 		if (audio) {
 			audio->release();
 		}
-		printf("%s\n", s);
+		fprintf(stderr, "%s\n", s);
 		return -1;
 	}
 }
@@ -886,7 +911,7 @@ int proc_scene_change(
 			else{	// 無音区間内で第2候補シーンチェンジ
 					mark = "＠";
 			}
-			printf("\t SCPos: %d %s\n", d_max_pos[k], mark);
+			fprintf(stderr, "\t SCPos: %d %s\n", d_max_pos[k], mark);
 			ncount_sc ++;
 
 			char title[256];

@@ -24,11 +24,12 @@
  * For more information, contact us at licensing@x264.com.
  *****************************************************************************/
 
-#if _WIN32
+#if defined(_WIN32)
 #include <windows.h>
 #define avs_open() LoadLibraryW( L"avisynth.dll" )
 #define avs_close FreeLibrary
 #define avs_address GetProcAddress
+typedef HMODULE avs_library_t;
 #else
 #include <dlfcn.h>
 #if SYS_MACOSX
@@ -38,6 +39,7 @@
 #endif
 #define avs_close dlclose
 #define avs_address dlsym
+typedef void *avs_library_t;
 #endif
 
 #define AVSC_NO_DECLSPEC
@@ -77,7 +79,7 @@ typedef struct
 {
     AVS_Clip *clip;
     AVS_ScriptEnvironment *env;
-    void *library;
+    avs_library_t library;
     int num_frames;
     struct
     {

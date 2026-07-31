@@ -8,7 +8,7 @@ class CFAW {
 	bool is_half;
 
 	bool load_failed;
-	void* _h;
+	library_handle_t _h;
 
 #ifdef _WIN32
 	typedef int (__stdcall *ExtractDecode1FAW)(const short *in, int samples, short *out, bool is_half);
@@ -36,7 +36,11 @@ class CFAW {
 		return _ExtractDecode1FAW != NULL;
 	}
 public:
-	CFAW() : _h(NULL), _ExtractDecode1FAW(NULL), load_failed(false), is_half(false) { }
+	CFAW()
+		: is_half(false),
+		  load_failed(false),
+		  _h(NULL),
+		  _ExtractDecode1FAW(NULL) { }
 
 	~CFAW() {
 		if (_h) {
