@@ -7,7 +7,7 @@
 //---------------------------------------------------------------------
 
 #ifdef _WIN32
-#include <Windows.h>
+#include <windows.h>
 #include <algorithm>
 #else
 #include <string.h>
@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <stdio.h>
+#include "mvec_simd.h"
 
 #define MAX_LINEOBJ		20		// 固定ライン検出する画面周囲からの検索範囲
 
@@ -42,9 +43,9 @@ int mvec(int *mvec1,int *mvec2,int *flag_sc,unsigned char* current_pix,unsigned 
 int search_change(int* val, unsigned char* pc, unsigned char* pb, int lx, int ly, int x, int y, int thres_fine, int thres_sc, int pict_struct);
 int tree_search(unsigned char* current_pix,unsigned char* bef_pix,int lx,int ly,int *vx,int *vy,int search_block_x,int search_block_y,int min,int pict_struct, int method);
 int full_search(unsigned char* current_pix,unsigned char* bef_pix,int lx,int ly,int *vx,int *vy,int search_block_x,int search_block_y,int min,int pict_struct, int search_extent);
-int dist( unsigned char *p1, unsigned char *p2, int lx, int distlim, int block_height );
-int maxmin_block( unsigned char *p, int lx, int block_height );
-int avgdist( int *avg, unsigned char *psrc, int lx, int block_height );
+using mvec_simd::avgdist;
+using mvec_simd::dist;
+using mvec_simd::maxmin_block;
 
 //---------------------------------------------------------------------
 //		グローバル変数
@@ -72,9 +73,9 @@ int mvec(
 {
 	int x, y;
 	unsigned char *p1, *p2;
-	int calc_total_lane_i0, calc_total_lane_i1;
-	int rate_sc, rate_sc_all;
-	int b_sc, b_sc_all;
+	int calc_total_lane_i0 = 0, calc_total_lane_i1 = 0;
+	int rate_sc, rate_sc_all = 0;
+	int b_sc, b_sc_all = 0;
 	int thr_blank, thr_noobj, thr_mergin;
 
 //関数を呼び出す毎に計算せずにすむようグローバル変数とする
@@ -401,9 +402,11 @@ int mvec(
 			b_sc = 0;
 		}
 		if (0){	// debug
-			if (nframe >= 6548 && nframe <= 6553 || nframe >= 19020 && nframe <= 19026 ||
-				nframe >= 36396 && nframe <= 36396 || nframe >= 47105 && nframe <= 47123){
-				printf("f:%d | %d %d,(%d,%d,[%d,%d,%d]),%d,%d,%d,%d,(%d,%d,%d,%d),%d,%d(%d)\n",
+			if ((nframe >= 6548 && nframe <= 6553) ||
+				(nframe >= 19020 && nframe <= 19026) ||
+				(nframe >= 36396 && nframe <= 36396) ||
+				(nframe >= 47105 && nframe <= 47123)){
+				fprintf(stderr, "f:%d | %d %d,(%d,%d,[%d,%d,%d]),%d,%d,%d,%d,(%d,%d,%d,%d),%d,%d(%d)\n",
 				rate_sc, nframe, cnt_sc, cnt_sc_low1, cnt_sc_low2,
 				cnt_sc_center_low1, cnt_sc_center_low2, cnt_center_detobj,
 				areacnt_blank1, areacnt_blank2, areacnt_blankand, areacnt_blankor,
@@ -515,7 +518,7 @@ int tree_search(unsigned char* current_pix,	//現フレームの輝度。8ビッ
 				int method)					//検索の簡易化（0:探索多回数 1:２分探索 2:検索省略 3:探索多回数外周）
 {
 	tree++;
-	int dx, dy, ddx=0, ddy=0, xs=0, ys;
+	int dx, dy, ddx=0, ddy=0, ys=0;
 	int d;
 	int x,y;
 	int locx, locy;
@@ -686,193 +689,3 @@ int full_search(unsigned char* current_pix,	//現フレームの輝度。8ビッ
 
 	return min;
 }
-//---------------------------------------------------------------------
-//		フレーム間絶対値差合計関数
-//---------------------------------------------------------------------
-//bbMPEGのソースを流用
-#ifdef SYS_ARM64
-#include "sse2neon.h"
-#else
-#include <emmintrin.h>
-#endif
-
-int dist( unsigned char *p1, unsigned char *p2, int lx, int distlim, int block_height )
-{
-	if (block_height == 8) {
-		__m128i a, b, r;
-
-		a = _mm_load_si128 ((__m128i*)p1 +  0);
-		b = _mm_loadu_si128((__m128i*)p2 +  0);
-		r = _mm_sad_epu8(a, b);
-
-		a = _mm_load_si128 ((__m128i*)(p1 + lx));
-		b = _mm_loadu_si128((__m128i*)(p2 + lx));
-		r = _mm_add_epi32(r, _mm_sad_epu8(a, b));
-
-		a = _mm_load_si128 ((__m128i*)(p1 + 2*lx));
-		b = _mm_loadu_si128((__m128i*)(p2 + 2*lx));
-		r = _mm_add_epi32(r, _mm_sad_epu8(a, b));
-
-		a = _mm_load_si128 ((__m128i*)(p1 + 3*lx));
-		b = _mm_loadu_si128((__m128i*)(p2 + 3*lx));
-		r = _mm_add_epi32(r, _mm_sad_epu8(a, b));
-
-		a = _mm_load_si128 ((__m128i*)(p1 + 4*lx));
-		b = _mm_loadu_si128((__m128i*)(p2 + 4*lx));
-		r = _mm_add_epi32(r, _mm_sad_epu8(a, b));
-
-		a = _mm_load_si128 ((__m128i*)(p1 + 5*lx));
-		b = _mm_loadu_si128((__m128i*)(p2 + 5*lx));
-		r = _mm_add_epi32(r, _mm_sad_epu8(a, b));
-
-		a = _mm_load_si128 ((__m128i*)(p1 + 6*lx));
-		b = _mm_loadu_si128((__m128i*)(p2 + 6*lx));
-		r = _mm_add_epi32(r, _mm_sad_epu8(a, b));
-
-		a = _mm_load_si128 ((__m128i*)(p1 + 7*lx));
-		b = _mm_loadu_si128((__m128i*)(p2 + 7*lx));
-		r = _mm_add_epi32(r, _mm_sad_epu8(a, b));
-		return _mm_extract_epi16(r, 0) + _mm_extract_epi16(r, 4);;
-	}
-
-	int s = 0;
-	for(int i=0;i<block_height;i++)
-	{
-		/*
-		s += motion_lookup[p1[0]][p2[0]];
-		s += motion_lookup[p1[1]][p2[1]];
-		s += motion_lookup[p1[2]][p2[2]];
-		s += motion_lookup[p1[3]][p2[3]];
-		s += motion_lookup[p1[4]][p2[4]];
-		s += motion_lookup[p1[5]][p2[5]];
-		s += motion_lookup[p1[6]][p2[6]];
-		s += motion_lookup[p1[7]][p2[7]];
-		s += motion_lookup[p1[8]][p2[8]];
-		s += motion_lookup[p1[9]][p2[9]];
-		s += motion_lookup[p1[10]][p2[10]];
-		s += motion_lookup[p1[11]][p2[11]];
-		s += motion_lookup[p1[12]][p2[12]];
-		s += motion_lookup[p1[13]][p2[13]];
-		s += motion_lookup[p1[14]][p2[14]];
-		s += motion_lookup[p1[15]][p2[15]];*/
-
-		__m128i a = _mm_load_si128((__m128i*)p1);
-		__m128i b = _mm_loadu_si128((__m128i*)p2);
-		__m128i r = _mm_sad_epu8(a, b);
-		s += _mm_extract_epi16(r, 0) + _mm_extract_epi16(r, 4);
-
-		if (s > distlim)	break;
-
-		p1 += lx;
-		p2 += lx;
-	}
-	return s;
-}
-
-
-//---------------------------------------------------------------------
-//		フレーム間絶対値差合計関数(SSEバージョン)
-//---------------------------------------------------------------------
-int dist_SSE( unsigned char *p1, unsigned char *p2, int lx, int distlim, int block_height )
-{
-	int s = 0;
-/*
-dist_normalを見ると分かるように、p1とp2の絶対値差を足してき、distlimを超えたらその合計を返すだけ。
-block_heightには8か16が代入されており、前者はフィールド処理、後者がフレーム処理用。
-block_heightに8が代入されていたらば、lxには画像の横幅が代入されている。
-block_heightに16が代入されていたらば、lxには画像の横幅の二倍の値が代入されている。
-どなたか、ここを作成していただけたらば、非常に感謝いたします。
-*/
-	return s;
-}
-
-
-//---------------------------------------------------------------------
-//		ブロック内の最大輝度差取得関数
-//---------------------------------------------------------------------
-int maxmin_block( unsigned char *p, int lx, int block_height )
-{
-	__m128i rmin, rmax, a, b, z;
-
-	// 各列の最大・最小を求める
-	rmin = _mm_load_si128((__m128i*)p);
-	rmax = _mm_load_si128((__m128i*)p);
-	p += lx;
-	for(int i=1; i<block_height; i++){
-		a = _mm_load_si128((__m128i*)p);
-		rmin = _mm_min_epu8(rmin, a);
-		rmax = _mm_max_epu8(rmax, a);
-		p += lx;
-	}
-	// 列間の最大・最小を求める
-	// 16データの最大・最小を８データに絞る
-	z    = _mm_setzero_si128();
-	a    = _mm_unpackhi_epi8(rmin, z);
-	b    = _mm_unpacklo_epi8(rmin, z);
-	rmin = _mm_min_epi16(a, b);
-	a    = _mm_unpackhi_epi8(rmax, z);
-	b    = _mm_unpacklo_epi8(rmax, z);
-	rmax = _mm_max_epi16(a, b);
-	// 8から4
-	a    = _mm_unpackhi_epi16(rmin, z);
-	b    = _mm_unpacklo_epi16(rmin, z);
-	rmin = _mm_min_epi16(a, b);
-	a    = _mm_unpackhi_epi16(rmax, z);
-	b    = _mm_unpacklo_epi16(rmax, z);
-	rmax = _mm_max_epi16(a, b);
-	// 4から2
-	a    = _mm_unpackhi_epi32(rmin, z);
-	b    = _mm_unpacklo_epi32(rmin, z);
-	rmin = _mm_min_epi16(a, b);
-	a    = _mm_unpackhi_epi32(rmax, z);
-	b    = _mm_unpacklo_epi32(rmax, z);
-	rmax = _mm_max_epi16(a, b);
-	// 2から1
-	a    = _mm_unpackhi_epi64(rmin, z);
-	b    = _mm_unpacklo_epi64(rmin, z);
-	rmin = _mm_min_epi16(a, b);
-	a    = _mm_unpackhi_epi64(rmax, z);
-	b    = _mm_unpacklo_epi64(rmax, z);
-	rmax = _mm_max_epi16(a, b);
-	// 結果取り出し
-	int val_min = _mm_extract_epi16(rmin, 0);
-	int val_max = _mm_extract_epi16(rmax, 0);
-
-	return val_max - val_min;
-}
-
-//---------------------------------------------------------------------
-//		フレーム内平均値からの絶対値差合計関数
-//---------------------------------------------------------------------
-int avgdist( int *avg, unsigned char *psrc, int lx, int block_height )
-{
-	__m128i a, b, r;
-	unsigned char *p;
-	int sum;
-	unsigned char d_avg;
-
-	// ループ２回で結果を取得
-	// １回目：平均値を取得
-	// ２回目：平均値からの絶対値差合計を取得
-
-	b = _mm_setzero_si128();				// 平均値取得用の比較値
-	for(int i=0; i<2; i++){
-		p = psrc;							// 取得フレーム開始位置
-		r = _mm_setzero_si128();			// 結果初期化
-		for(int j=0; j<block_height; j++){
-			a = _mm_loadu_si128((__m128i*)p);
-			r = _mm_add_epi32(r, _mm_sad_epu8(a, b));
-			p += lx;
-		}
-		sum = _mm_extract_epi16(r, 0) + _mm_extract_epi16(r, 4);
-
-		// １回目の結果は２回目の比較対象値とする（平均値算出＋代入）
-		if (i == 0){
-			d_avg = (unsigned char) ((sum + (block_height * 16/2)) / (block_height * 16));
-			b = _mm_set1_epi8(d_avg);
-		}
-	}
-	*avg = d_avg;
-	return sum;
-}
-

@@ -2,20 +2,25 @@ CXX ?= g++
 PKG_CONFIG ?= pkg-config
 
 PROGRAM := chapter_exe
-OBJS := chapter_exe.o mvec.o
+OBJS := chapter_exe.o mvec.o mvec_simd.o
 
 WITH_AVISYNTH ?= auto
 WITH_DTVINDEX ?= auto
 DTVINDEX_DIR ?=
+SIMD_BACKEND ?= auto
 
 FFMPEG_PACKAGES := libavformat libavcodec libavutil libswscale libswresample
 VALID_FEATURE_VALUES := auto yes no
+VALID_SIMD_BACKENDS := auto sse2 neon scalar
 
 ifeq ($(filter $(WITH_AVISYNTH),$(VALID_FEATURE_VALUES)),)
   $(error WITH_AVISYNTH must be auto, yes, or no)
 endif
 ifeq ($(filter $(WITH_DTVINDEX),$(VALID_FEATURE_VALUES)),)
   $(error WITH_DTVINDEX must be auto, yes, or no)
+endif
+ifeq ($(filter $(SIMD_BACKEND),$(VALID_SIMD_BACKENDS)),)
+  $(error SIMD_BACKEND must be auto, sse2, neon, or scalar)
 endif
 
 CPPFLAGS := -I../extras -I.
@@ -24,7 +29,16 @@ CXXFLAGS := -O3 -ffast-math -Wall -Wshadow -Wempty-body \
 LDLIBS := -pthread
 DTVINDEX_DEPS :=
 
-# ChapterEXE keeps the AviSynth C API header in the repository and loads the
+ifeq ($(SIMD_BACKEND),sse2)
+  CPPFLAGS += -DMVEC_SIMD_FORCE_SSE2=1
+  CXXFLAGS += -msse2
+else ifeq ($(SIMD_BACKEND),neon)
+  CPPFLAGS += -DMVEC_SIMD_FORCE_NEON=1
+else ifeq ($(SIMD_BACKEND),scalar)
+  CPPFLAGS += -DMVEC_SIMD_FORCE_SCALAR=1
+endif
+
+# chapter_exe keeps the AviSynth C API header in the repository and loads the
 # runtime library dynamically. The development library is not required.
 AVISYNTH_FOUND := $(strip $(if \
 	$(and $(wildcard ../avisynth/avs_internal.c),\
@@ -132,26 +146,15 @@ ifeq ($(OS),Windows_NT)
   CXXFLAGS += -finput-charset=UTF-8 -fexec-charset=CP932 \
 	-DSYS_WINDOWS=1 -msse4.1
 else
-  UNAME_MACHINE := $(shell uname -m)
   UNAME_SYSTEM := $(shell uname -s)
-
-  ifeq ($(UNAME_MACHINE),aarch64)
-    CPPFLAGS += -DSYS_ARM64
-    ifeq ($(UNAME_SYSTEM),Linux)
-      HAVE_NEON := $(shell $(CXX) -mfpu=neon -dM -E - </dev/null \
-		>/dev/null 2>&1 && echo yes || echo no)
-      ifeq ($(HAVE_NEON),yes)
-        CXXFLAGS += -mfpu=neon
-      endif
-    endif
-  endif
 
   ifeq ($(UNAME_SYSTEM),Linux)
     LDLIBS += -ldl
   endif
 endif
 
-$(info ChapterEXE input support: AviSynth=$(ENABLE_AVISYNTH) dtvindex=$(ENABLE_DTVINDEX)$(if $(filter yes,$(ENABLE_DTVINDEX)),$(if $(DTVINDEX_MODE), ($(DTVINDEX_MODE)))))
+$(info chapter_exe input support: AviSynth=$(ENABLE_AVISYNTH) dtvindex=$(ENABLE_DTVINDEX)$(if $(filter yes,$(ENABLE_DTVINDEX)),$(if $(DTVINDEX_MODE), ($(DTVINDEX_MODE)))))
+$(info chapter_exe motion SIMD: $(SIMD_BACKEND))
 
 .SUFFIXES: .cpp .o
 
@@ -160,20 +163,24 @@ $(info ChapterEXE input support: AviSynth=$(ENABLE_AVISYNTH) dtvindex=$(ENABLE_D
 all: $(PROGRAM)
 
 $(PROGRAM): $(OBJS) $(DTVINDEX_DEPS)
-	$(CXX) -o $@ $(OBJS) $(LDLIBS)
+	$(CXX) $(LDFLAGS) -o $@ $(OBJS) $(LDLIBS)
 
 ifeq ($(DTVINDEX_MODE),source)
 $(DTVINDEX_LIBRARY):
 	$(MAKE) -C "$(DTVINDEX_SOURCE_DIR)" build/libdtvindex.a
 endif
 
-chapter_exe.o: source.h
+chapter_exe.o: source.h mvec_simd.h
+ifeq ($(ENABLE_AVISYNTH),yes)
+chapter_exe.o: ../avisynth/avs_internal.c ../extras/avisynth_c.h
+endif
 ifeq ($(ENABLE_DTVINDEX),yes)
 chapter_exe.o: dtvindex_source.h ffmpeg_source.h
 endif
+mvec.o mvec_simd.o: mvec_simd.h
 
 .cpp.o:
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $<
 
 clean:
-	$(RM) $(PROGRAM) $(OBJS)
+	$(RM) chapter_exe chapter_exe.exe $(OBJS)
