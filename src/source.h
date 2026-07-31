@@ -441,7 +441,6 @@ public:
 #endif
 
 #if HAVE_DTVINDEX
-#include "ffmpeg_source.h"
 #include "dtvindex_source.h"
 #endif
 

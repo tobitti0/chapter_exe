@@ -188,7 +188,7 @@ ifeq ($(ENABLE_AVISYNTH),yes)
 chapter_exe.o: ../avisynth/avs_internal.c ../extras/avisynth_c.h
 endif
 ifeq ($(ENABLE_DTVINDEX),yes)
-chapter_exe.o: dtvindex_source.h ffmpeg_source.h
+chapter_exe.o: dtvindex_source.h ffmpeg_audio_reader.h
 endif
 mvec.o mvec_simd.o: mvec_simd.h
 

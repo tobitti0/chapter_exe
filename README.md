@@ -1,16 +1,22 @@
-# chapter_exe for AviSynth+ and FFmpeg
+# chapter_exe for AviSynth+ and dtvindex
+
 ## 概要
+
 AviSynth+はVer3.5.0からNative Linuxをサポートした。  
-これは[sogaani氏][1]がLinuxに移植された[chapter_exe][2]をAvisynth+3.5.xを使用するようにしたもの。  
+これは[sogaani氏][1]がLinuxに移植された[chapter_exe][2]をAviSynth+3.5.xで動作するように改造し、Windows版のAviSynth入力にも対応したものである。
 また、WindowsとLinuxの両環境にてビルドおよび使用できる。
 
-`future/dtvindex`ブランチでは従来のAVS入力に加えて、FFmpegが対応する動画ファイルを直接入力できる。  動画ファイルには[dtvindex][3]が作成する共通フレーム番号を使用する。
+従来のAVS入力に加えて、FFmpegが対応する動画ファイルを
+[dtvindex][3]経由で入力できる。dtvindexがFFmpegで映像をデコードし、
+作成した共通フレーム番号を使用する。
 
 従来AviSynth+を使う利点は、デコード、フィルタ、フレーム単位のランダムアクセスをフレームサーバーへ任せられることにあった。  
-本ブランチの映像は[dtvindex][3]の永続インデックスとフレーム読み込み API、音声は`FFmpegSource`の16bit PCM変換とPTS同期を使用する。  
+動画ファイル入力の映像は[dtvindex][3]の永続インデックスとフレーム読み込みAPI、
+音声は内部のFFmpeg音声リーダーによる16bit PCM変換とPTS同期を使用する。
 既存の無音検索およびシーンチェンジ検出処理は変更していない。
 
-dtvindex直接入力では、L-SMASH Works入力と同様に内部の`thin_audio_read`を既定で`0`にし、音声を連続して読み込む。  
+dtvindex経由の動画ファイル入力では、L-SMASH Works入力と同様に
+内部の`thin_audio_read`を既定で`0`にし、音声を連続して読み込む。
 `--thin`または`--serial`を明示した場合は、その指定を優先する。
 
 [1]:https://github.com/sogaani
@@ -18,16 +24,8 @@ dtvindex直接入力では、L-SMASH Works入力と同様に内部の`thin_audio
 [3]:https://github.com/tobitti0/dtvindex
 
 ## 機能
+
 無音検索＋シーンチェンジ(SC)検索を行い、無音・SC位置の情報を出力する。
-
-## FFmpeg機能のAviSynth+入力との互換性
-
-FFmpeg直接入力とdtvindex入力は、従来の無音検索およびシーンチェンジ検出を変更せず、入力部分だけを拡張している。
-
-MPEG-2放送TS 3本をAviSynth+／L-SMASH Works入力と比較した場合、無音・シーンチェンジ位置は±30フレームの範囲で85.2%から95.5%が対応し、最終フレーム番号の差は0から3フレームだった。  
-LogoframeおよびJoinLogoScpまで組み合わせた最終Trimは、放送TS 5本すべてでAviSynth+入力と同一になった。
-
-この数値はMPEG-2放送TSに対する互換性の目安であり、異なるコーデック、破損状態、タイムスタンプ構成で同じ結果を保証するものではない。
 
 ## 使用方法
 
@@ -37,22 +35,23 @@ LogoframeおよびJoinLogoScpまで組み合わせた最終Trimは、放送TS 5�
 make
 ```
 
-AviSynth入力はリポジトリ内のC APIヘッダーを使用してコンパイルされ、
-実行時にAviSynth+を動的に読み込む。dtvindex入力は次の順序で検出する。
+AviSynth入力に必要なC APIヘッダーと動的ロード処理はソースツリーに同梱している。
+ビルド時にAviSynthの開発用ヘッダーやライブラリは不要で、実行時にWindowsでは
+`avisynth.dll`、LinuxではAviSynth+の共有ライブラリを読み込む。
+dtvindex経由の動画ファイル入力は次の順序で検出する。
 
 1. `DTVINDEX_DIR`で指定したソースツリー
 2. `src/libdtvindex.a`と`src/include/dtvindex/dtvindex.hpp`
 3. `pkg-config`で検出できるインストール済みdtvindex
 4. `chapter_exe`と同じ親ディレクトリにあるdtvindexソースツリー
 
-dtvindex入力に必要なFFmpeg開発ライブラリは次のとおり。
+dtvindex経由の動画ファイル入力に必要なFFmpeg開発ライブラリは次のとおり。
 
 ```
 libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev
 ```
 
-入力機能は明示的に有効化または無効化できる。`yes`を指定した機能の
-依存関係が見つからない場合はビルドエラーになる。
+入力機能は明示的に有効化または無効化できる。
 
 ```console
 make WITH_AVISYNTH=yes WITH_DTVINDEX=no
@@ -60,24 +59,66 @@ make WITH_AVISYNTH=no WITH_DTVINDEX=yes
 make DTVINDEX_DIR=/path/to/dtvindex
 ```
 
+### モーション検索のSIMD
+
+モーション検索はビルド対象に応じて、x86/x86_64ではSSE2、
+ARM/ARM64ではNEONを使用する。どちらも使用できない環境では
+同じ計算を行うscalar実装へフォールバックする。
+既定の`auto`以外を明示してビルドすることもできる。
+
+```console
+make SIMD_BACKEND=auto
+make SIMD_BACKEND=sse2
+make SIMD_BACKEND=neon
+make SIMD_BACKEND=scalar
+```
+
+実際に選ばれたバックエンドは起動時の`Motion SIMD :`表示で確認できる。
+
+### Windows版のビルド
+
+64 bit版MinGW-w64、`mingw32-make`、Windows向けに静的ビルドした
+FFmpegの開発ファイルを用意し、その`pkg-config`定義を検索できる状態で
+`src`ディレクトリから次を実行する。
+
+```bat
+compile.cmd
+```
+
+このコマンドは64 bit Windows向けの`chapter_exe.exe`を作成する。
+MinGWのランタイム、FFmpeg、dtvindexは静的リンクされるため、実行時に
+別途必要になるのはWindowsのシステムDLLと、AVS入力時のAviSynth+だけである。
+AviSynth+は64 bit版をインストールするか、`AviSynth.dll`を
+`chapter_exe.exe`と同じディレクトリへ配置する。
+
 起動時には、ビルドで有効になった入力機能を表示する。
 
 ```text
-chapter_exe: AviSynth=enabled, dtvindex=enabled
+chapter_exe
+  Input       : AviSynth=enabled, dtvindex=enabled
+  Motion SIMD : SSE2
 ```
 
-実行方法は次のとおり。
-````
-chapter_exe -v "画像ソースファイル" -a "音声ソースファイル" -o "出力先txt" -m 無音閾値 -s 連続フレーム数
-````
-`-v`には従来の`.avs`ファイル、またはTS、MP4、MKVなどの動画ファイルを指定できる。`.avs`は従来どおりAvisynth+で、それ以外はdtvindexを経由してFFmpegで読み込む。  
-動画ファイルの初回読み込み時には同じ場所へ`.dtvi`を作成し、2回目以降は元ファイルとの整合性を検証して再利用する。
+ヘッダー、設定、進捗、警告、エラーは標準エラー出力へ表示する。
+通常実行時の標準出力は使用せず、Chapter解析結果は`-o`で指定した
+ファイルへ出力する。
 
-例:
-````
-chapter_exe -v "input.ts" -o "output.txt"
-chapter_exe -v "input.avs" -o "output.txt"
-````
+実行方法は次のとおり。
+
+```console
+chapter_exe -v 動画またはAVSファイル名 [-a 音声ソースファイル名] -o 出力ファイル名 他オプション
+```
+
+`-v`には従来の`.avs`ファイル、またはTS、MP4、MKVなどの動画ファイルを
+指定できる。`.avs`は従来どおりAviSynth+で読み込み、それ以外は
+dtvindex経由の動画ファイル入力となる。dtvindexはFFmpegで映像をデコードする。
+動画ファイルの初回読み込み時には同じ場所へ`.dtvi`を作成し、2回目以降は
+元ファイルとの整合性を検証して再利用する。
+
+```console
+chapter_exe -v input.ts -o output.txt
+chapter_exe -v input.avs -o output.txt
+```
 
 詳細は[オリジナルのreadme][4]、[改造版のreadme][5]を参照してください。
 
@@ -87,13 +128,11 @@ chapter_exe -v "input.avs" -o "output.txt"
 ## 著作表示
 
 - オリジナルのchapter_exe: [ru氏][6]
-- シーンチェンジ検出などの改造: [Yobi氏][8]、sysuzu氏
+- シーンチェンジ検出などの改造: [Yobi氏][7]、sysuzu氏
 - Linux／AvxSynth対応: [sogaani氏][1]
-- AviSynth+対応、FFmpeg直接入力、dtvindex連携などの拡張: tobitti0
+- AviSynth+対応、dtvindex経由の動画ファイル入力などの拡張: tobitti0
 
 `avisynth/avs_internal.c`はx264 projectの`avs.c`を基礎としている。  
-ARM向けの`extras/sse2neon.h`は[DLTcollab/sse2neon][7]によるMIT Licenseのコードである。
 
 [6]:https://github.com/rutice
-[7]:https://github.com/DLTcollab/sse2neon
-[8]:https://github.com/yobibi
+[7]:https://github.com/yobibi

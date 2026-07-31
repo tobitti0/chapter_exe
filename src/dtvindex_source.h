@@ -2,63 +2,101 @@
 #define __DTVINDEX_SOURCE__
 
 #include "dtvindex/dtvindex.hpp"
-#include "ffmpeg_source.h"
+#include "ffmpeg_audio_reader.h"
 
 #include <algorithm>
 #include <climits>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <memory>
 #include <stdexcept>
 #include <string>
 
-class DtvIndexSource : public FFmpegSource {
+class DtvIndexSource : public NullSource {
 private:
     std::string _media_path;
     std::string _index_path;
     dtvindex::Index _index;
     std::unique_ptr<dtvindex::VideoReader> _reader;
+    BITMAPINFOHEADER _format;
+    FFmpegAudioReader _audio;
 
 public:
     DtvIndexSource()
-        : FFmpegSource(), _index(), _reader() {
+        : NullSource(),
+          _index(),
+          _reader(),
+          _format(),
+          _audio() {
     }
 
     void init(const char *infile) {
-        FFmpegSource::init(infile);
-        if (!has_video()) {
-            return;
-        }
-
         _media_path = infile;
-        _index_path = dtvindex::Index::default_index_path(_media_path);
-        bool created = false;
-        _index = dtvindex::Index::load_or_build(
-            _media_path, _index_path, &created);
+        _audio.init(infile);
 
-        const dtvindex::StreamInfo &stream = _index.stream();
-        if (stream.width != _ip.format->biWidth ||
-            stream.height != _ip.format->biHeight) {
-            throw std::runtime_error(
-                "dtvindex dimensions do not match FFmpegSource");
+        if (_audio.has_video_stream()) {
+            _index_path =
+                dtvindex::Index::default_index_path(_media_path);
+            bool created = false;
+            _index = dtvindex::Index::load_or_build(
+                _media_path, _index_path, &created);
+
+            const dtvindex::StreamInfo &stream = _index.stream();
+            if (stream.width <= 0 || stream.height <= 0 ||
+                stream.frame_rate.numerator <= 0 ||
+                stream.frame_rate.denominator <= 0) {
+                throw std::runtime_error(
+                    "dtvindex contains invalid video metadata");
+            }
+            if (stream.width != _audio.video_width() ||
+                stream.height != _audio.video_height()) {
+                throw std::runtime_error(
+                    "dtvindex dimensions do not match the media stream");
+            }
+
+            memset(&_format, 0, sizeof(_format));
+            _format.biSize = sizeof(_format);
+            _format.biWidth = stream.width;
+            _format.biHeight = stream.height;
+            _format.biPlanes = 1;
+            _format.biBitCount = 8;
+
+            _ip.flag |= INPUT_INFO_FLAG_VIDEO |
+                        INPUT_INFO_FLAG_VIDEO_RANDOM_ACCESS;
+            _ip.rate = stream.frame_rate.numerator;
+            _ip.scale = stream.frame_rate.denominator;
+            _ip.n = static_cast<int>(
+                std::min<std::uint64_t>(
+                    _index.frames().size(), INT_MAX));
+            _ip.format = &_format;
+            _ip.format_size = sizeof(_format);
+            _reader.reset(new dtvindex::VideoReader(
+                _media_path, _index));
+
+            fprintf(stderr,
+                    " -DtvIndexSource: %s %s (%d frames)\n",
+                    created ? "created" : "reused",
+                    _index_path.c_str(),
+                    _ip.n);
         }
-        if (stream.frame_rate.numerator <= 0 ||
-            stream.frame_rate.denominator <= 0) {
-            throw std::runtime_error(
-                "dtvindex does not contain a usable frame rate");
+
+        if (_audio.has_audio()) {
+            _ip.flag |= INPUT_INFO_FLAG_AUDIO;
+            const int64_t sample_count = _audio.sample_count();
+            _ip.audio_n =
+                sample_count < 0
+                    ? -1
+                    : static_cast<int>(
+                          std::min<int64_t>(sample_count, INT_MAX));
+            _ip.audio_format = _audio.format();
+            _ip.audio_format_size = sizeof(*_ip.audio_format);
         }
 
-        _ip.rate = stream.frame_rate.numerator;
-        _ip.scale = stream.frame_rate.denominator;
-        _ip.n = static_cast<int>(
-            std::min<std::uint64_t>(_index.frames().size(), INT_MAX));
-        _reader.reset(new dtvindex::VideoReader(
-            _media_path, _index));
-
-        printf(" -DtvIndexSource: %s %s (%d frames)\n",
-               created ? "created" : "reused",
-               _index_path.c_str(),
-               _ip.n);
+        if (!has_video() && !has_audio()) {
+            throw std::runtime_error(
+                "Input contains neither video nor audio");
+        }
     }
 
     bool read_video_y8(int frame, unsigned char *luma) {
@@ -81,6 +119,10 @@ public:
                 width);
         }
         return true;
+    }
+
+    int read_audio(int frame, short *buf) {
+        return _audio.read(frame, _ip.rate, _ip.scale, buf);
     }
 };
 
