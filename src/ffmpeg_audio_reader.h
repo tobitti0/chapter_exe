@@ -2,6 +2,7 @@
 #define CHAPTER_EXE_FFMPEG_AUDIO_READER_H
 
 #include <algorithm>
+#include <cerrno>
 #include <climits>
 #include <cstddef>
 #include <cstdint>
@@ -16,6 +17,7 @@ extern "C" {
 #include <libavutil/channel_layout.h>
 #include <libavutil/error.h>
 #include <libavutil/mathematics.h>
+#include <libavutil/samplefmt.h>
 #include <libswresample/swresample.h>
 }
 
@@ -38,6 +40,11 @@ private:
     int _channels;
     int _sample_rate;
     SwrContext *_swr_context;
+    AVChannelLayout _swr_input_layout;
+    AVSampleFormat _swr_input_format;
+    int _swr_input_rate;
+    bool _swr_configured;
+    bool _primed_frame;
     std::vector<int16_t> _fifo;
     size_t _fifo_offset;
     int64_t _front_sample;
@@ -58,6 +65,36 @@ private:
         return error_code == AVERROR_STREAM_NOT_FOUND;
     }
 
+    int matching_broadcast_audio_stream(int video_stream_index) const {
+        if (video_stream_index < 0 ||
+            video_stream_index >=
+                static_cast<int>(_format_context->nb_streams)) {
+            return -1;
+        }
+        const int video_id =
+            _format_context->streams[video_stream_index]->id;
+        int selected = -1;
+        int selected_difference = INT_MAX;
+        for (unsigned int index = 0;
+             index < _format_context->nb_streams;
+             ++index) {
+            AVStream *candidate = _format_context->streams[index];
+            if (candidate->codecpar->codec_type != AVMEDIA_TYPE_AUDIO ||
+                avcodec_find_decoder(candidate->codecpar->codec_id) == NULL) {
+                continue;
+            }
+            const int difference = candidate->id - video_id;
+            // ARIB transport streams conventionally place the primary and
+            // secondary audio PIDs 0x10..0x1f after their video PID.
+            if (difference >= 0x10 && difference <= 0x1f &&
+                difference < selected_difference) {
+                selected = static_cast<int>(index);
+                selected_difference = difference;
+            }
+        }
+        return selected;
+    }
+
     void report_recoverable_decode_error(int error_code) {
         if (_decode_warnings < 10) {
             char error_text[AV_ERROR_MAX_STRING_SIZE] = {0};
@@ -71,6 +108,15 @@ private:
             }
         }
         ++_decode_warnings;
+    }
+
+    static bool is_recoverable_packet_submission_error(int error_code) {
+        // The AAC decoder in FFmpeg 7.1 returns EPERM, rather than
+        // AVERROR_INVALIDDATA, for a malformed PCE whose sample-rate index
+        // conflicts with the transport stream metadata.  The packet is
+        // unusable, but subsequent packets can still be decoded normally.
+        return error_code == AVERROR_INVALIDDATA ||
+               error_code == AVERROR(EPERM);
     }
 
     int64_t stream_start_in_microseconds(int stream_index) const {
@@ -117,6 +163,88 @@ private:
         return layout;
     }
 
+    bool usable_audio_frame(const AVFrame *frame) const {
+        const int expected_channels =
+            _swr_configured
+                ? _swr_input_layout.nb_channels
+                : frame != NULL ? frame->ch_layout.nb_channels : 0;
+        const AVSampleFormat expected_format =
+            _swr_configured
+                ? _swr_input_format
+                : frame != NULL
+                      ? static_cast<AVSampleFormat>(frame->format)
+                      : AV_SAMPLE_FMT_NONE;
+        if (frame == NULL || frame->nb_samples <= 0 ||
+            expected_channels <= 0 ||
+            expected_format == AV_SAMPLE_FMT_NONE ||
+            frame->extended_data == NULL) {
+            return false;
+        }
+        const int plane_count =
+            av_sample_fmt_is_planar(expected_format)
+                ? expected_channels
+                : 1;
+        for (int plane = 0; plane < plane_count; ++plane) {
+            if (frame->extended_data[plane] == NULL) {
+                return false;
+            }
+        }
+        return frame->sample_rate > 0 || _codec_context->sample_rate > 0;
+    }
+
+    void configure_resampler(const AVChannelLayout &input_layout,
+                             AVSampleFormat input_format,
+                             int input_rate) {
+        AVChannelLayout normalized_input =
+            normalized_channel_layout(input_layout);
+        if (_swr_configured &&
+            _swr_input_format == input_format &&
+            _swr_input_rate == input_rate &&
+            av_channel_layout_compare(
+                &_swr_input_layout, &normalized_input) == 0) {
+            av_channel_layout_uninit(&normalized_input);
+            return;
+        }
+
+        swr_free(&_swr_context);
+        av_channel_layout_uninit(&_swr_input_layout);
+        AVChannelLayout output_layout = {};
+        av_channel_layout_default(&output_layout, _channels);
+        int ret = swr_alloc_set_opts2(
+            &_swr_context,
+            &output_layout,
+            AV_SAMPLE_FMT_S16,
+            _sample_rate,
+            &normalized_input,
+            input_format,
+            input_rate,
+            0,
+            NULL);
+        av_channel_layout_uninit(&output_layout);
+        if (ret < 0) {
+            av_channel_layout_uninit(&normalized_input);
+            throw make_error(
+                "FFmpeg could not configure audio conversion", ret);
+        }
+        ret = swr_init(_swr_context);
+        if (ret < 0) {
+            av_channel_layout_uninit(&normalized_input);
+            throw make_error(
+                "FFmpeg could not initialize audio conversion", ret);
+        }
+
+        ret = av_channel_layout_copy(
+            &_swr_input_layout, &normalized_input);
+        av_channel_layout_uninit(&normalized_input);
+        if (ret < 0) {
+            throw make_error(
+                "FFmpeg could not retain the audio channel layout", ret);
+        }
+        _swr_input_format = input_format;
+        _swr_input_rate = input_rate;
+        _swr_configured = true;
+    }
+
     void initialize_timeline() {
         _fifo.clear();
         _fifo_offset = 0;
@@ -124,41 +252,30 @@ private:
         _fallback_next_sample = _timeline_start;
     }
 
-    void configure_audio() {
+    void configure_audio(
+        const AVFrame *initial_frame = NULL,
+        int64_t preferred_video_start_time_us = AV_NOPTS_VALUE) {
         AVStream *stream = _format_context->streams[_stream_index];
-        _channels = _codec_context->ch_layout.nb_channels;
-        _sample_rate = _codec_context->sample_rate;
+        const AVChannelLayout &initial_layout =
+            initial_frame != NULL
+                ? initial_frame->ch_layout
+                : _codec_context->ch_layout;
+        const AVSampleFormat initial_format =
+            initial_frame != NULL
+                ? static_cast<AVSampleFormat>(initial_frame->format)
+                : _codec_context->sample_fmt;
+        const int initial_rate =
+            initial_frame != NULL && initial_frame->sample_rate > 0
+                ? initial_frame->sample_rate
+                : _codec_context->sample_rate;
+        _channels = initial_layout.nb_channels;
+        _sample_rate = initial_rate;
         if (_channels <= 0 || _sample_rate <= 0) {
             throw std::runtime_error(
                 "FFmpeg reported an invalid audio format");
         }
-
-        AVChannelLayout input_layout =
-            normalized_channel_layout(_codec_context->ch_layout);
-        AVChannelLayout output_layout =
-            normalized_channel_layout(input_layout);
-        int ret = swr_alloc_set_opts2(
-            &_swr_context,
-            &output_layout,
-            AV_SAMPLE_FMT_S16,
-            _sample_rate,
-            &input_layout,
-            _codec_context->sample_fmt,
-            _sample_rate,
-            0,
-            NULL);
-        av_channel_layout_uninit(&input_layout);
-        av_channel_layout_uninit(&output_layout);
-        if (ret < 0) {
-            throw make_error(
-                "FFmpeg could not configure audio conversion", ret);
-        }
-
-        ret = swr_init(_swr_context);
-        if (ret < 0) {
-            throw make_error(
-                "FFmpeg could not initialize audio conversion", ret);
-        }
+        configure_resampler(
+            initial_layout, initial_format, initial_rate);
 
         memset(&_format, 0, sizeof(_format));
         _format.wFormatTag = WAVE_FORMAT_PCM;
@@ -172,10 +289,12 @@ private:
 
         _sample_count = estimate_samples(stream);
         _timeline_start = 0;
-        _video_start_time_us = AV_NOPTS_VALUE;
+        _video_start_time_us = preferred_video_start_time_us;
         if (_has_video_stream) {
             const int64_t video_start =
-                stream_start_in_microseconds(_video_stream_index);
+                preferred_video_start_time_us != AV_NOPTS_VALUE
+                    ? preferred_video_start_time_us
+                    : stream_start_in_microseconds(_video_stream_index);
             const int64_t audio_start =
                 stream_start_in_microseconds(_stream_index);
             _video_start_time_us = video_start;
@@ -188,16 +307,73 @@ private:
             }
         }
         initialize_timeline();
+    }
 
-        _packet = av_packet_alloc();
-        _frame = av_frame_alloc();
-        if (_packet == NULL || _frame == NULL) {
-            throw std::runtime_error(
-                "FFmpeg could not allocate audio decode buffers");
+    bool prime_decoder_until_usable() {
+        av_frame_unref(_frame);
+        for (;;) {
+            int ret = avcodec_receive_frame(_codec_context, _frame);
+            if (ret == 0) {
+                if (usable_audio_frame(_frame)) {
+                    _primed_frame = true;
+                    return true;
+                }
+                report_recoverable_decode_error(AVERROR_INVALIDDATA);
+                av_frame_unref(_frame);
+                continue;
+            }
+            if (ret == AVERROR_EOF) {
+                return false;
+            }
+            if (ret == AVERROR_INVALIDDATA) {
+                report_recoverable_decode_error(ret);
+                continue;
+            }
+            if (ret != AVERROR(EAGAIN)) {
+                throw make_error("FFmpeg audio decoding failed", ret);
+            }
+
+            for (;;) {
+                ret = av_read_frame(_format_context, _packet);
+                if (ret == AVERROR_EOF) {
+                    _demux_eof = true;
+                    return false;
+                }
+                if (ret == AVERROR_INVALIDDATA) {
+                    av_packet_unref(_packet);
+                    continue;
+                }
+                if (ret < 0) {
+                    throw make_error(
+                        "FFmpeg audio packet reading failed", ret);
+                }
+                if (_packet->stream_index != _stream_index) {
+                    av_packet_unref(_packet);
+                    continue;
+                }
+                ret = avcodec_send_packet(_codec_context, _packet);
+                av_packet_unref(_packet);
+                if (is_recoverable_packet_submission_error(ret)) {
+                    report_recoverable_decode_error(ret);
+                    continue;
+                }
+                if (ret == AVERROR(EAGAIN)) {
+                    break;
+                }
+                if (ret < 0) {
+                    throw make_error(
+                        "FFmpeg audio packet submission failed", ret);
+                }
+                break;
+            }
         }
     }
 
-    void append_converted_frame() {
+    bool append_converted_frame() {
+        if (!usable_audio_frame(_frame)) {
+            report_recoverable_decode_error(AVERROR_INVALIDDATA);
+            return false;
+        }
         if (_frame->sample_rate != 0 &&
             _frame->sample_rate != _sample_rate) {
             throw std::runtime_error(
@@ -270,6 +446,7 @@ private:
                         skip_samples * _channels),
                 converted.end());
         }
+        return true;
     }
 
     void flush_resampler() {
@@ -312,12 +489,23 @@ private:
     }
 
     bool decode_next_frame() {
+        if (_primed_frame) {
+            _primed_frame = false;
+            const bool appended = append_converted_frame();
+            av_frame_unref(_frame);
+            if (appended) {
+                return true;
+            }
+        }
         av_frame_unref(_frame);
         for (;;) {
             int ret = avcodec_receive_frame(_codec_context, _frame);
             if (ret == 0) {
-                append_converted_frame();
-                return true;
+                if (append_converted_frame()) {
+                    return true;
+                }
+                av_frame_unref(_frame);
+                continue;
             }
             if (ret == AVERROR_EOF) {
                 flush_resampler();
@@ -363,7 +551,7 @@ private:
 
                 ret = avcodec_send_packet(_codec_context, _packet);
                 av_packet_unref(_packet);
-                if (ret == AVERROR_INVALIDDATA) {
+                if (is_recoverable_packet_submission_error(ret)) {
                     report_recoverable_decode_error(ret);
                     continue;
                 }
@@ -442,6 +630,7 @@ private:
         _demux_eof = false;
         _flush_sent = false;
         _resampler_flushed = false;
+        _primed_frame = false;
         initialize_timeline();
     }
 
@@ -464,6 +653,11 @@ public:
           _channels(0),
           _sample_rate(0),
           _swr_context(NULL),
+          _swr_input_layout(),
+          _swr_input_format(AV_SAMPLE_FMT_NONE),
+          _swr_input_rate(0),
+          _swr_configured(false),
+          _primed_frame(false),
           _fifo_offset(0),
           _front_sample(0),
           _timeline_start(0),
@@ -474,13 +668,17 @@ public:
 
     ~FFmpegAudioReader() {
         swr_free(&_swr_context);
+        av_channel_layout_uninit(&_swr_input_layout);
         av_frame_free(&_frame);
         av_packet_free(&_packet);
         avcodec_free_context(&_codec_context);
         avformat_close_input(&_format_context);
     }
 
-    void init(const char *infile) {
+    void init(
+        const char *infile,
+        int preferred_video_stream = -1,
+        int64_t preferred_video_start_time_us = AV_NOPTS_VALUE) {
         int ret = avformat_open_input(
             &_format_context, infile, NULL, NULL);
         if (ret < 0) {
@@ -492,13 +690,48 @@ public:
                 "FFmpeg could not read stream information", ret);
         }
 
-        ret = av_find_best_stream(
+        const int detected_video_stream = av_find_best_stream(
             _format_context,
             AVMEDIA_TYPE_VIDEO,
             -1,
             -1,
             NULL,
             0);
+        if (preferred_video_stream >=
+            static_cast<int>(_format_context->nb_streams)) {
+            AVPacket *discovery_packet = av_packet_alloc();
+            if (discovery_packet == NULL) {
+                throw std::runtime_error(
+                    "FFmpeg could not allocate a stream discovery packet");
+            }
+            while (preferred_video_stream >=
+                   static_cast<int>(_format_context->nb_streams)) {
+                ret = av_read_frame(
+                    _format_context, discovery_packet);
+                if (ret == AVERROR_INVALIDDATA) {
+                    av_packet_unref(discovery_packet);
+                    continue;
+                }
+                if (ret < 0) {
+                    av_packet_free(&discovery_packet);
+                    if (ret == AVERROR_EOF) {
+                        throw std::runtime_error(
+                            "Indexed video stream was not found while "
+                            "selecting its audio");
+                    }
+                    throw make_error(
+                        "FFmpeg failed while discovering the indexed "
+                        "video stream",
+                        ret);
+                }
+                av_packet_unref(discovery_packet);
+            }
+            av_packet_free(&discovery_packet);
+        }
+        ret = preferred_video_stream >= 0
+                  ? preferred_video_stream
+                  : detected_video_stream;
+        bool use_preferred_video_start = false;
         if (ret >= 0) {
             AVStream *video_stream = _format_context->streams[ret];
             if ((video_stream->disposition &
@@ -507,6 +740,10 @@ public:
                 _video_width = video_stream->codecpar->width;
                 _video_height = video_stream->codecpar->height;
                 _has_video_stream = true;
+                use_preferred_video_start =
+                    preferred_video_start_time_us != AV_NOPTS_VALUE &&
+                    (ret != detected_video_stream ||
+                     _video_width <= 0 || _video_height <= 0);
             }
         } else if (!is_missing_stream_error(ret)) {
             throw make_error(
@@ -514,13 +751,21 @@ public:
         }
 
         const AVCodec *decoder = NULL;
-        ret = av_find_best_stream(
-            _format_context,
-            AVMEDIA_TYPE_AUDIO,
-            -1,
-            -1,
-            &decoder,
-            0);
+        const int matching_stream =
+            matching_broadcast_audio_stream(_video_stream_index);
+        ret = matching_stream;
+        if (ret >= 0) {
+            decoder = avcodec_find_decoder(
+                _format_context->streams[ret]->codecpar->codec_id);
+        } else {
+            ret = av_find_best_stream(
+                _format_context,
+                AVMEDIA_TYPE_AUDIO,
+                -1,
+                _video_stream_index,
+                &decoder,
+                0);
+        }
         if (is_missing_stream_error(ret)) {
             avformat_close_input(&_format_context);
             return;
@@ -550,9 +795,37 @@ public:
                 "FFmpeg could not open the audio decoder", ret);
         }
 
-        configure_audio();
+        _packet = av_packet_alloc();
+        _frame = av_frame_alloc();
+        if (_packet == NULL || _frame == NULL) {
+            throw std::runtime_error(
+                "FFmpeg could not allocate audio decode buffers");
+        }
+
+        const bool needs_format_probe =
+            _codec_context->ch_layout.nb_channels <= 0 ||
+            _codec_context->sample_rate <= 0 ||
+            _codec_context->sample_fmt == AV_SAMPLE_FMT_NONE;
+        if (needs_format_probe) {
+            if (!prime_decoder_until_usable()) {
+                throw std::runtime_error(
+                    "FFmpeg could not recover the delayed audio format");
+            }
+            configure_audio(
+                _frame,
+                use_preferred_video_start
+                    ? preferred_video_start_time_us
+                    : AV_NOPTS_VALUE);
+        } else {
+            configure_audio(
+                NULL,
+                use_preferred_video_start
+                    ? preferred_video_start_time_us
+                    : AV_NOPTS_VALUE);
+        }
         fprintf(stderr,
-                " -Audio: FFmpeg (%d channels, %d Hz)\n",
+                " -Audio: FFmpeg stream %d (%d channels, %d Hz)\n",
+                _stream_index,
                 _channels,
                 _sample_rate);
     }
