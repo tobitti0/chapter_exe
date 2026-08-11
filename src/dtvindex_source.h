@@ -33,53 +33,65 @@ public:
 
     void init(const char *infile) {
         _media_path = infile;
-        _audio.init(infile);
+        _index_path =
+            dtvindex::Index::default_index_path(_media_path);
+        bool created = false;
+        _index = dtvindex::Index::load_or_build(
+            _media_path, _index_path, &created);
 
-        if (_audio.has_video_stream()) {
-            _index_path =
-                dtvindex::Index::default_index_path(_media_path);
-            bool created = false;
-            _index = dtvindex::Index::load_or_build(
-                _media_path, _index_path, &created);
-
-            const dtvindex::StreamInfo &stream = _index.stream();
-            if (stream.width <= 0 || stream.height <= 0 ||
-                stream.frame_rate.numerator <= 0 ||
-                stream.frame_rate.denominator <= 0) {
-                throw std::runtime_error(
-                    "dtvindex contains invalid video metadata");
-            }
-            if (stream.width != _audio.video_width() ||
-                stream.height != _audio.video_height()) {
-                throw std::runtime_error(
-                    "dtvindex dimensions do not match the media stream");
-            }
-
-            memset(&_format, 0, sizeof(_format));
-            _format.biSize = sizeof(_format);
-            _format.biWidth = stream.width;
-            _format.biHeight = stream.height;
-            _format.biPlanes = 1;
-            _format.biBitCount = 8;
-
-            _ip.flag |= INPUT_INFO_FLAG_VIDEO |
-                        INPUT_INFO_FLAG_VIDEO_RANDOM_ACCESS;
-            _ip.rate = stream.frame_rate.numerator;
-            _ip.scale = stream.frame_rate.denominator;
-            _ip.n = static_cast<int>(
-                std::min<std::uint64_t>(
-                    _index.frames().size(), INT_MAX));
-            _ip.format = &_format;
-            _ip.format_size = sizeof(_format);
-            _reader.reset(new dtvindex::VideoReader(
-                _media_path, _index));
-
-            fprintf(stderr,
-                    " -DtvIndexSource: %s %s (%d frames)\n",
-                    created ? "created" : "reused",
-                    _index_path.c_str(),
-                    _ip.n);
+        const dtvindex::StreamInfo &stream = _index.stream();
+        if (stream.width <= 0 || stream.height <= 0 ||
+            stream.frame_rate.numerator <= 0 ||
+            stream.frame_rate.denominator <= 0) {
+            throw std::runtime_error(
+                "dtvindex contains invalid video metadata");
         }
+
+        std::int64_t video_start_time_us = AV_NOPTS_VALUE;
+        if (!_index.frames().empty()) {
+            const dtvindex::FrameRecord &first = _index.frames().front();
+            const std::int64_t timestamp =
+                (first.flags & dtvindex::kFramePtsValid) != 0
+                    ? first.pts
+                    : (first.flags & dtvindex::kFrameDtsValid) != 0
+                          ? first.dts
+                          : AV_NOPTS_VALUE;
+            if (timestamp != AV_NOPTS_VALUE) {
+                const AVRational time_base = {
+                    stream.time_base.numerator,
+                    stream.time_base.denominator};
+                video_start_time_us = av_rescale_q(
+                    timestamp, time_base, AV_TIME_BASE_Q);
+            }
+        }
+        _audio.init(
+            infile, stream.stream_index, video_start_time_us);
+
+        memset(&_format, 0, sizeof(_format));
+        _format.biSize = sizeof(_format);
+        _format.biWidth = stream.width;
+        _format.biHeight = stream.height;
+        _format.biPlanes = 1;
+        _format.biBitCount = 8;
+
+        _ip.flag |= INPUT_INFO_FLAG_VIDEO |
+                    INPUT_INFO_FLAG_VIDEO_RANDOM_ACCESS;
+        _ip.rate = stream.frame_rate.numerator;
+        _ip.scale = stream.frame_rate.denominator;
+        _ip.n = static_cast<int>(
+            std::min<std::uint64_t>(
+                _index.frames().size(), INT_MAX));
+        _ip.format = &_format;
+        _ip.format_size = sizeof(_format);
+        _reader.reset(new dtvindex::VideoReader(
+            _media_path, _index));
+
+        fprintf(stderr,
+                " -DtvIndexSource: %s %s, stream %d (%d frames)\n",
+                created ? "created" : "reused",
+                _index_path.c_str(),
+                stream.stream_index,
+                _ip.n);
 
         if (_audio.has_audio()) {
             _ip.flag |= INPUT_INFO_FLAG_AUDIO;
@@ -91,11 +103,6 @@ public:
                           std::min<int64_t>(sample_count, INT_MAX));
             _ip.audio_format = _audio.format();
             _ip.audio_format_size = sizeof(*_ip.audio_format);
-        }
-
-        if (!has_video() && !has_audio()) {
-            throw std::runtime_error(
-                "Input contains neither video nor audio");
         }
     }
 
